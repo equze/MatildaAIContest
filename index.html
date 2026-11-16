@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#100b1d">
+  <meta name="description" content="MatildaAIContest — сравнение сайтов, созданных нейросетями по одному заданию.">
+  <title>MatildaAIContest</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0e0a17;
+      --surface: #171122;
+      --surface-soft: #1d162b;
+      --surface-hover: #251b37;
+      --line: rgba(205, 174, 255, .13);
+      --line-strong: rgba(205, 174, 255, .25);
+      --text: #f5f0fc;
+      --muted: #a99bbd;
+      --muted-soft: #81738f;
+      --purple: #a77aff;
+      --purple-light: #c5a7ff;
+      --purple-deep: #7447c5;
+      --green: #a5e6c5;
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(ellipse at 50% -15%, rgba(132, 79, 205, .23), transparent 52%),
+        linear-gradient(180deg, #110b1c 0%, var(--bg) 42%, #0b0811 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, a { font: inherit; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible {
+      outline: 2px solid var(--purple-light);
+      outline-offset: 3px;
+    }
+
+    .shell { width: min(980px, calc(100% - 40px)); margin: 0 auto; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 66px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: .16em;
+      text-decoration: none;
+    }
+    .brand span { color: var(--purple-light); }
+    .topbar-actions { display: flex; align-items: center; gap: 12px; }
+    .topbar-note {
+      color: var(--muted-soft);
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .stats-nav-button {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      color: #e9def9;
+      background: rgba(167,122,255,.08);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 650;
+      transition: background .18s ease, border-color .18s ease;
+    }
+    .stats-nav-button:hover { border-color: rgba(197,167,255,.55); background: rgba(167,122,255,.15); }
+    .rules-content { display: grid; gap: 10px; }
+    .rules-section {
+      padding: 15px 16px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255,255,255,.018);
+    }
+    .rules-section h3 { margin: 0 0 8px; color: #f2eafa; font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+    .rules-section p { margin: 7px 0 0; color: #b7a9c7; font-size: 11px; line-height: 1.65; }
+    .rules-section ul, .rules-section ol { display: grid; gap: 6px; margin: 8px 0 0; padding-left: 18px; color: #b7a9c7; font-size: 11px; line-height: 1.6; }
+    .rules-section li::marker { color: var(--purple-light); }
+    .rules-highlight {
+      border-color: rgba(167,122,255,.42);
+      background: linear-gradient(135deg, rgba(167,122,255,.11), rgba(167,122,255,.035));
+    }
+    .rules-highlight h3 { color: #e5d5ff; }
+    .rules-highlight p { color: #d2c4e3; }
+    .rules-tag { display: inline-block; margin-bottom: 7px; color: var(--purple-light); font-size: 8px; font-weight: 750; letter-spacing: .15em; text-transform: uppercase; }
+    .rules-formula { display: inline-block; margin-top: 8px; padding: 7px 10px; border: 1px solid rgba(205,174,255,.12); border-radius: 8px; color: #efe5ff; background: rgba(0,0,0,.16); font-size: 10px; }
+
+    .hero { padding: 40px 0 27px; }
+    .eyebrow {
+      margin: 0 0 13px;
+      color: var(--purple-light);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 720px;
+      margin: 0;
+      font-size: clamp(34px, 6vw, 58px);
+      line-height: 1.02;
+      letter-spacing: -.065em;
+      font-weight: 850;
+    }
+    h1 span {
+      display: block;
+      color: transparent;
+      background: linear-gradient(100deg, #d9c4ff 0%, #a77aff 55%, #8b6be0 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+    }
+    .hero-bottom {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 22px;
+      margin-top: 17px;
+    }
+    .hero-copy {
+      max-width: 570px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .hero-stat {
+      flex: 0 0 auto;
+      min-width: 112px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255,255,255,.025);
+    }
+    .hero-stat strong { display: block; font-size: 21px; letter-spacing: -.04em; }
+    .hero-stat span { color: var(--muted); font-size: 10px; }
+
+    .section-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 15px;
+      margin: 12px 0 14px;
+    }
+    .section-kicker {
+      margin: 0 0 5px;
+      color: var(--muted-soft);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: .17em;
+      text-transform: uppercase;
+    }
+    h2 { margin: 0; font-size: 21px; letter-spacing: -.045em; }
+    .section-hint { color: var(--muted-soft); font-size: 11px; }
+    #tests-list { display: grid; gap: 12px; padding-bottom: 48px; }
+    #tests-section[hidden] { display: none !important; }
+    .stats-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      overflow: auto;
+      background: rgba(5,3,9,.80);
+      backdrop-filter: blur(11px);
+      -webkit-backdrop-filter: blur(11px);
+      animation: fade-in .18s ease both;
+    }
+    .stats-modal-backdrop[hidden] { display: none !important; }
+    .stats-dialog {
+      width: min(960px, 100%);
+      max-height: calc(100dvh - 40px);
+      overflow: auto;
+      padding: 21px;
+      border: 1px solid var(--line-strong);
+      border-radius: 19px;
+      background: linear-gradient(145deg, #191225, #100b19 82%);
+      box-shadow: 0 28px 100px rgba(0,0,0,.58);
+      animation: stats-modal-in .22s cubic-bezier(.2,.75,.25,1) both;
+      overscroll-behavior: contain;
+    }
+    @keyframes stats-modal-in {
+      from { opacity: 0; transform: translateY(12px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .stats-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin: 10px 0 17px; }
+    .stats-back { flex: 0 0 auto; }
+    .stats-tabs { display: flex; gap: 7px; overflow-x: auto; padding: 2px 1px 10px; margin-bottom: 14px; scrollbar-width: thin; }
+    .stats-tab { flex: 0 0 auto; min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: rgba(255,255,255,.025); cursor: pointer; font-size: 10px; font-weight: 650; white-space: nowrap; transition: .16s ease; }
+    .stats-tab:hover { border-color: var(--line-strong); color: var(--text); }
+    .stats-tab[aria-selected="true"] { border-color: rgba(167,122,255,.58); color: #f5edff; background: rgba(167,122,255,.13); }
+    .stats-overview { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 9px; margin-bottom: 20px; }
+    .stats-card { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(145deg, rgba(29,22,43,.86), rgba(17,12,27,.9)); }
+    .stats-card-label { display: block; color: var(--muted-soft); font-size: 9px; line-height: 1.4; }
+    .stats-card-value { display: block; margin-top: 7px; color: #f3ecfc; font-size: clamp(17px, 2.5vw, 23px); font-weight: 650; letter-spacing: -.04em; overflow-wrap: anywhere; }
+    .stats-card-note { display: block; margin-top: 4px; color: #766b84; font-size: 9px; line-height: 1.45; }
+    .stats-subheading { margin: 21px 0 10px; font-size: 14px; font-weight: 700; letter-spacing: -.025em; }
+    .model-stat-list { display: grid; gap: 8px; }
+    .model-stat-row { display: grid; grid-template-columns: minmax(145px,1.2fr) repeat(4,minmax(0,1fr)); align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.018); }
+    .model-stat-name { display: flex; align-items: center; gap: 8px; min-width: 0; color: #f3edf9; font-size: 11px; font-weight: 650; }
+    .model-stat-name span:last-child { overflow-wrap: anywhere; }
+    .model-stat-cell { min-width: 0; }
+    .model-stat-cell strong { display: block; color: #ded4eb; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+    .model-stat-cell small { display: block; margin-top: 3px; color: var(--muted-soft); font-size: 8px; }
+    .stats-insights { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+    .stats-insight { padding: 12px; border: 1px solid rgba(205,174,255,.09); border-radius: 11px; background: rgba(167,122,255,.035); }
+    .stats-insight-label { display: block; color: var(--muted-soft); font-size: 9px; }
+    .stats-insight-value { display: block; margin-top: 6px; color: #e9dfff; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+    .stats-insight-note { display: block; margin-top: 4px; color: #7f738e; font-size: 8px; line-height: 1.45; }
+    .mode-stats-intro { margin: -5px 0 14px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .mode-model-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+    .mode-model-card { padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.018); }
+    .mode-model-title { display: flex; align-items: center; gap: 8px; margin: 0 0 5px; color: #fff; font-size: 12px; font-weight: 650; }
+    .mode-model-full { margin: 0 0 12px; color: var(--muted-soft); font-size: 9px; line-height: 1.5; }
+    .mode-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+    .mode-metric { padding-top: 8px; border-top: 1px solid rgba(205,174,255,.07); }
+    .mode-metric strong { display: block; color: #ded4eb; font-size: 12px; font-weight: 600; }
+    .mode-metric small { display: block; margin-top: 3px; color: var(--muted-soft); font-size: 8px; }
+    .stats-footnote { margin: 13px 0 0; color: #776d83; font-size: 9px; line-height: 1.55; }
+
+    .test-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(28,20,43,.97), rgba(18,13,28,.98));
+      box-shadow: 0 14px 40px rgba(0,0,0,.16);
+      transition: border-color .2s ease, background .2s ease;
+    }
+    .test-card:hover { border-color: var(--line-strong); }
+    .test-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 15px 16px 11px;
+    }
+    .test-index {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--purple-light);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+    .test-title { margin: 0; font-size: 18px; font-weight: 780; letter-spacing: -.045em; }
+    .test-description {
+      max-width: 680px;
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .participant-count {
+      flex: 0 0 auto;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: #c8b8dc;
+      background: rgba(255,255,255,.025);
+      font-size: 9px;
+      white-space: nowrap;
+    }
+
+    .model-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+      padding: 0 16px 14px;
+    }
+    .model-button {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 9px;
+      min-width: 0;
+      min-height: 40px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--text);
+      background: rgba(255,255,255,.025);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+    }
+    .model-button:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--model-color) 48%, transparent);
+      background: color-mix(in srgb, var(--model-color) 8%, rgba(255,255,255,.025));
+    }
+    .model-button:focus-visible {
+      outline-color: var(--model-color);
+    }
+    .model-dot {
+      flex: 0 0 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--model-color);
+      box-shadow: 0 0 10px color-mix(in srgb, var(--model-color) 38%, transparent);
+    }
+    .model-button[aria-expanded="true"] {
+      border-color: color-mix(in srgb, var(--model-color) 60%, transparent);
+      background: color-mix(in srgb, var(--model-color) 12%, rgba(255,255,255,.025));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--model-color) 12%, transparent);
+    }
+    .model-button strong { overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .model-button .button-state { margin-left: 8px; color: var(--muted-soft); font-size: 10px; white-space: nowrap; }
+    .model-button[aria-expanded="true"] .button-state { color: var(--model-color); }
+    .model-button:disabled { opacity: .34; cursor: not-allowed; }
+
+    .details-panel {
+      margin: 0 16px 14px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(8,5,14,.35);
+      animation: panel-in .24s cubic-bezier(.2,.75,.25,1) both;
+      transform-origin: top center;
+      will-change: transform, filter;
+    }
+    @keyframes panel-in {
+      from { transform: translateY(8px) scale(.992); filter: blur(2px); }
+      to { transform: translateY(0) scale(1); filter: blur(0); }
+    }
+    .details-label {
+      margin: 0 0 5px;
+      color: var(--muted-soft);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+    .full-model-name {
+      margin: 0;
+      color: #ffffff;
+      font-size: clamp(18px, 2.2vw, 20px);
+      font-weight: 600;
+      letter-spacing: -.02em;
+      line-height: 1.35;
+    }
+    .details-note { margin: 5px 0 0; color: var(--muted-soft); font-size: 10px; line-height: 1.5; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+    .metric {
+      min-width: 0;
+      padding: 7px 8px;
+      border: 1px solid rgba(205,174,255,.055);
+      border-radius: 9px;
+      background: rgba(255,255,255,.012);
+    }
+    .metric-value {
+      display: block;
+      overflow: hidden;
+      color: #b9accb;
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: -.02em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .metric-label { display: block; margin-top: 4px; color: #82758f; font-size: 8px; line-height: 1.35; }
+    .metric-inline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; min-width: 0; }
+    .metric-inline .metric-value { display: inline-block; }
+    .metric-extra { display: inline-block; color: #756982; font-size: 8px; line-height: 1.35; }
+    .details-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+    .action-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 37px;
+      padding: 0 13px;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      color: #e9def9;
+      background: rgba(255,255,255,.035);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: border-color .18s ease, background .18s ease;
+    }
+    .action-button:hover:not(:disabled) { border-color: rgba(205,174,255,.45); background: rgba(167,122,255,.1); }
+    .action-button.primary {
+      border-color: transparent;
+      color: #fff;
+      background: linear-gradient(110deg, #8757d2, #7046bd);
+      box-shadow: 0 5px 16px rgba(112,70,189,.18);
+    }
+    .action-button.primary:hover:not(:disabled) { background: linear-gradient(110deg, #986be0, #8054cc); }
+    .action-button:disabled { opacity: .4; cursor: not-allowed; }
+
+    .empty-state, .error-state {
+      padding: 26px 18px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 14px;
+      color: var(--muted);
+      background: rgba(255,255,255,.018);
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    .error-state strong { display: block; margin-bottom: 5px; color: #e2b2c8; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(5,3,9,.78);
+      backdrop-filter: blur(10px);
+      animation: fade-in .16s ease both;
+    }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .prompt-modal {
+      display: flex;
+      flex-direction: column;
+      width: min(680px, 100%);
+      max-height: min(720px, calc(100dvh - 32px));
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 17px;
+      background: #181123;
+      box-shadow: 0 24px 90px rgba(0,0,0,.5);
+    }
+    .modal-head, .modal-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 15px 17px;
+    }
+    .modal-head { border-bottom: 1px solid var(--line); }
+    .modal-title { margin: 0; font-size: 14px; letter-spacing: -.025em; }
+    .modal-subtitle { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+    .modal-close {
+      min-height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 650;
+    }
+    .modal-close:hover { color: var(--text); background: rgba(255,255,255,.05); }
+    .prompt-text {
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      color: #ddd1ed;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .modal-foot { border-top: 1px solid var(--line); }
+    .copy-status { min-height: 14px; color: var(--green); font-size: 10px; }
+
+    @media (max-width: 680px) {
+      .shell { width: min(100% - 28px, 540px); }
+      .topbar { min-height: 58px; }
+      .topbar-note { display: none; }
+      .topbar-actions { gap: 7px; }
+      .stats-nav-button { min-height: 32px; padding: 0 9px; font-size: 10px; }
+      .stats-overview { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+      .stats-card { padding: 10px; }
+      .model-stat-row { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+      .model-stat-name { grid-column: 1 / -1; }
+      .stats-insights { grid-template-columns: 1fr; }
+      .mode-model-grid { grid-template-columns: 1fr; }
+      .hero { padding: 39px 0 27px; }
+      h1 { font-size: clamp(32px, 10vw, 48px); }
+      .hero-bottom { align-items: flex-start; flex-direction: column; gap: 13px; margin-top: 13px; }
+      .hero-copy { font-size: 12px; }
+      .hero-stat { display: flex; align-items: baseline; gap: 8px; padding: 8px 11px; }
+      .hero-stat strong { font-size: 17px; }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 5px; margin-top: 8px; }
+      h2 { font-size: 19px; }
+      .test-card-head { padding: 16px 15px 12px; }
+      .test-title { font-size: 18px; }
+      .test-description { font-size: 11px; }
+      .participant-count { padding: 5px 7px; font-size: 8px; }
+      .model-buttons { grid-template-columns: 1fr; gap: 6px; padding: 0 15px 15px; }
+      .model-button { min-height: 42px; padding: 0 11px; }
+      .details-panel { margin: 0 15px 15px; padding: 13px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+      .metric { padding: 10px; }
+      .metric-value { font-size: 17px; }
+      .details-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .action-button { min-height: 40px; padding: 0 9px; text-align: center; }
+      #tests-list { gap: 10px; padding-bottom: 30px; }
+      .modal-backdrop { align-items: end; padding: 10px; }
+      .prompt-modal { max-height: calc(100dvh - 20px); border-radius: 15px; }
+      .stats-modal-backdrop { place-items: end center; padding: 10px; }
+      .stats-dialog { width: 100%; max-height: calc(100dvh - 20px); padding: 14px; border-radius: 15px; }
+      .stats-head { align-items: flex-start; }
+      .modal-head, .modal-foot { padding: 13px; }
+      .prompt-text { padding: 14px; font-size: 10px; }
+    }
+
+    @media (max-width: 380px) {
+      .shell { width: calc(100% - 22px); }
+      .test-card-head { gap: 8px; }
+      .participant-count { max-width: 78px; white-space: normal; text-align: center; }
+      .details-actions { grid-template-columns: 1fr; }
+      .stats-head { align-items: flex-start; flex-direction: column; }
+      .stats-overview { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell topbar">
+    <a class="brand" href="#top" aria-label="MatildaAIContest">MatildaAIContest</a>
+    <div class="topbar-actions">
+      <div class="topbar-note">AI WEBSITE CONTEST</div>
+      <button class="stats-nav-button" id="stats-nav-button" type="button" aria-expanded="false">Статистика</button>
+      <button class="stats-nav-button" id="rules-nav-button" type="button" aria-expanded="false">Правила</button>
+    </div>
+  </header>
+
+  <main class="shell" id="top">
+    <section class="hero">
+      <p class="eyebrow">AI WEBSITE CONTEST</p>
+      <h1>AI BATTLE <span>BY FATMATILDA</span></h1>
+      <div class="hero-bottom">
+        <p class="hero-copy">Сравнивай сайты, созданные разными нейросетями по одному заданию. Открывай статистику каждой модели, изучай общий промпт и запускай готовые работы.</p>
+        <div class="hero-stat">
+          <strong id="test-count">—</strong>
+          <span>тестов</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="tests-section" aria-labelledby="tests-heading">
+      <div class="section-head">
+        <div>
+          <p class="section-kicker">COLLECTION</p>
+          <h2 id="tests-heading">Сайты на сравнение</h2>
+        </div>
+        <div class="section-hint">Выбери модель, чтобы посмотреть результат</div>
+      </div>
+      <div id="tests-list" aria-live="polite">
+        <div class="empty-state">Загрузка тестов</div>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="stats-modal-backdrop" id="stats-modal-backdrop" hidden>
+    <section id="stats-section" class="stats-dialog" aria-labelledby="stats-heading" role="dialog" aria-modal="true">
+      <div class="stats-head">
+        <div>
+          <p class="section-kicker">ANALYTICS</p>
+          <h2 id="stats-heading">Статистика соревнования</h2>
+          <div class="section-hint">Сводные показатели по всем загруженным тестам</div>
+        </div>
+        <button class="action-button stats-back" id="stats-back-button" type="button">Закрыть</button>
+      </div>
+      <div class="stats-tabs" id="stats-tabs" role="tablist" aria-label="Разделы статистики"></div>
+      <div id="stats-content" aria-live="polite">
+        <div class="empty-state">Статистика появится после загрузки тестов.</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="stats-modal-backdrop" id="rules-modal-backdrop" hidden>
+    <section id="rules-dialog" class="stats-dialog" aria-labelledby="rules-heading" role="dialog" aria-modal="true">
+      <div class="stats-head">
+        <div>
+          <p class="section-kicker">CONTEST RULES</p>
+          <h2 id="rules-heading">Правила соревнования</h2>
+          <div class="section-hint">Как проводятся тесты и по каким принципам считаются показатели</div>
+        </div>
+        <button class="action-button stats-back" id="rules-close-button" type="button">Закрыть</button>
+      </div>
+
+      <div class="rules-content">
+        <section class="rules-section">
+          <span class="rules-tag">01 · Основной принцип</span>
+          <h3>Одинаковые условия для нейросетей</h3>
+          <p>В каждом режиме все участвующие нейросети получают один и тот же основной промпт. Текст задания, требования и исходные материалы должны быть одинаковыми. Цель — сравнить результаты моделей при равных стартовых условиях.</p>
+          <p>Для каждого режима используется свой промпт. Посмотреть его можно в карточке соответствующего теста.</p>
+        </section>
+
+        <section class="rules-section">
+          <span class="rules-tag">02 · Промпты и правки</span>
+          <h3>Основной запрос и дополнительные запросы</h3>
+          <ul>
+            <li><strong>Основной промпт</strong> — первое задание, которое получает модель.</li>
+            <li><strong>Дополнительная правка</strong> — каждый отдельный запрос после основного, который просит исправить, изменить или улучшить созданный сайт.</li>
+            <li>Один отправленный запрос считается одной правкой, даже если в нём перечислено несколько изменений.</li>
+            <li>Если после ответа нужно отправить ещё один корректирующий запрос, он считается следующей правкой.</li>
+            <li>Чтобы сравнение оставалось честным, желательно отправлять моделям одинаковые по смыслу дополнительные указания.</li>
+          </ul>
+        </section>
+
+        <section class="rules-section rules-highlight">
+          <span class="rules-tag">03 · Важное правило подсчёта времени</span>
+          <h3>Время создания включает все этапы работы</h3>
+          <p><strong>Время создания сайта — это общее время, затраченное на получение финальной версии, а не только время первого ответа нейросети.</strong></p>
+          <p>В подсчёт входят основной промпт, генерация первого результата, все последующие промпты, в том числе исправительные, и время генерации ответов на каждый из них. Если модель получила несколько запросов на доработку, время всех этих этапов суммируется.</p>
+          <p>Нельзя указывать только время создания первой версии, если после неё были дополнительные запросы и исправления. Для всех моделей в одном тесте нужно применять один и тот же способ замера.</p>
+        </section>
+
+        <section class="rules-section">
+          <span class="rules-tag">04 · Количество правок</span>
+          <h3>Как считать дополнительные правки</h3>
+          <p>В поле «Дополнительные правки» указывается количество корректирующих запросов, отправленных после основного промпта. Сам основной промпт в это число не входит.</p>
+          <p>Например: основной промпт + три отдельных сообщения с исправлениями = <strong>3 дополнительные правки</strong>.</p>
+        </section>
+
+        <section class="rules-section">
+          <span class="rules-tag">05 · Объём кода</span>
+          <h3>Строки, символы и среднее на строку</h3>
+          <ul>
+            <li><strong>Строки кода</strong> — количество строк во всех текстовых файлах, которые входят в финальную версию сайта.</li>
+            <li><strong>Символы</strong> — общее количество символов в этих исходных файлах. Для сопоставимости учитывайте пробелы и переносы строк одинаковым способом.</li>
+            <li><strong>Среднее число символов на строку</strong> рассчитывается автоматически: общее количество символов делится на количество строк.</li>
+            <li>Изображения и другие бинарные файлы в подсчёт строк и символов исходного кода не входят.</li>
+          </ul>
+          <span class="rules-formula">Символов на строку = символы ÷ строки</span>
+        </section>
+
+        <section class="rules-section">
+          <span class="rules-tag">06 · Названия моделей</span>
+          <h3>Указывайте точную модель</h3>
+          <p>В статистике следует записывать полное название использованной модели и, когда это применимо, её версию и режим работы (например, режим рассуждения). Не следует подменять точное название общим названием сервиса. Неизвестные характеристики не нужно угадывать.</p>
+        </section>
+
+        <section class="rules-section">
+          <span class="rules-tag">07 · Как читать статистику</span>
+          <h3>Общие показатели и показатели режима</h3>
+          <ul>
+            <li><strong>Общая статистика</strong> объединяет заполненные результаты всех загруженных режимов.</li>
+            <li><strong>Статистика режима</strong> сравнивает модели только внутри выбранного теста.</li>
+            <li>Суммарные значения складывают данные всех результатов, для которых соответствующее поле заполнено.</li>
+            <li>Средние значения рассчитываются только по результатам с указанными данными. Пустое поле не считается нулём.</li>
+            <li>Самое быстрое время, меньшее число правок или больший объём кода — это отдельные технические показатели, а не автоматическая оценка качества сайта.</li>
+          </ul>
+        </section>
+
+        <section class="rules-section">
+          <span class="rules-tag">08 · Заполнение данных</span>
+          <h3>Точность и единый формат</h3>
+          <ul>
+            <li>Данные каждой работы записываются в соответствующий <code>tests/название-режима/data.json</code>.</li>
+            <li>Время указывается в секундах, количество правок, строк и символов — целыми числами.</li>
+            <li>Если показатель неизвестен или не измерялся, лучше оставить поле пустым или не указывать его, а не ставить приблизительное значение.</li>
+            <li>После добавления нового режима его папку нужно включить в <code>tests/index.json</code>, чтобы главная страница и статистика загрузили его.</li>
+          </ul>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <div id="modal-root"></div>
+
+  <script>
+    const MODEL_CONFIG = {
+      alice:    { label: 'Алиса AI', color: '#a77aff' },
+      deepseek: { label: 'DeepSeek', color: '#5795ff' },
+      chatgpt:  { label: 'ChatGPT', color: '#50c98b' },
+      claude:   { label: 'Claude', color: '#f0a34b' }
+    };
+
+    const testsList = document.getElementById('tests-list');
+    const testCount = document.getElementById('test-count');
+    const modalRoot = document.getElementById('modal-root');
+
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[char]);
+    }
+
+    function formatDuration(totalSeconds) {
+      const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+      const minutes = Math.floor(seconds / 60);
+      const remainder = seconds % 60;
+      return `${minutes} мин ${String(remainder).padStart(2, '0')} сек`;
+    }
+
+    function formatDurationCompact(totalSeconds) {
+      const seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const remainder = seconds % 60;
+      if (hours > 0) return `${hours}ч ${String(minutes).padStart(2, '0')}м ${String(remainder).padStart(2, '0')}с`;
+      if (minutes > 0) return `${minutes}м ${String(remainder).padStart(2, '0')}с`;
+      return `${remainder}с`;
+    }
+
+    function formatNumber(value) {
+      if (value === null || value === undefined || value === '') return '—';
+      const number = Number(value);
+      return Number.isFinite(number) ? new Intl.NumberFormat('ru-RU').format(number) : '—';
+    }
+
+    function getAvailableModels(test) {
+      return Object.keys(MODEL_CONFIG).filter(key => {
+        const model = test.models?.[key];
+        return model && model.enabled !== false;
+      });
+    }
+
+    function renderTestCard(test, index) {
+      const availableModels = getAvailableModels(test);
+      const modelButtons = Object.entries(MODEL_CONFIG).map(([key, config]) => {
+        const model = test.models?.[key];
+        const isAvailable = Boolean(model && model.enabled !== false);
+        return `
+          <button class="model-button" type="button"
+            data-action="toggle-model" data-test-id="${escapeHTML(test.id)}" data-model-key="${key}"
+            aria-expanded="false" ${isAvailable ? '' : 'disabled'}
+            style="--model-color:${config.color}"
+            title="${isAvailable ? `Открыть результаты ${config.label}` : `${config.label}: данные пока не добавлены`}">
+            <span class="model-dot" aria-hidden="true"></span>
+            <strong>${config.label}</strong>
+            <span class="button-state">${isAvailable ? 'Подробнее' : 'Нет данных'}</span>
+          </button>`;
+      }).join('');
+
+      return `
+        <article class="test-card" data-test-card="${escapeHTML(test.id)}">
+          <div class="test-card-head">
+            <div>
+              <span class="test-index">TEST ${String(index + 1).padStart(3, '0')}</span>
+              <h3 class="test-title">${escapeHTML(test.title || test.id)}</h3>
+              <p class="test-description">${escapeHTML(test.description || 'Описание теста пока не добавлено.')}</p>
+            </div>
+            <span class="participant-count">${availableModels.length} / 4 модели</span>
+          </div>
+          <div class="model-buttons">${modelButtons}</div>
+          <div class="details-slot" data-details-slot="${escapeHTML(test.id)}"></div>
+        </article>`;
+    }
+
+    function renderModelDetails(test, modelKey) {
+      const model = test.models?.[modelKey];
+      const config = MODEL_CONFIG[modelKey];
+      if (!model || !config) return '';
+
+      const safeFile = typeof model.file === 'string' && /^[\w.-]+\.html$/i.test(model.file)
+        ? model.file
+        : '';
+      const launchPath = safeFile
+        ? `tests/${encodeURIComponent(test.id)}/${encodeURIComponent(safeFile)}`
+        : '';
+      const fullName = model.fullModel || config.label;
+      const revisions = model.revisions ?? '—';
+      const seconds = model.durationSeconds;
+      const duration = seconds !== null && seconds !== undefined && seconds !== '' && Number.isFinite(Number(seconds))
+        ? formatDuration(seconds)
+        : '—';
+      const lines = formatNumber(model.codeLines);
+      const chars = formatNumber(model.characters);
+      const lineCount = Number(model.codeLines);
+      const characterCount = Number(model.characters);
+      const averageCharactersPerLine = Number.isFinite(lineCount) && lineCount > 0
+        && Number.isFinite(characterCount) && characterCount >= 0
+        ? `${(characterCount / lineCount).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} / строку`
+        : '— / строку';
+      const promptExists = typeof test.prompt === 'string' && test.prompt.trim().length > 0;
+
+      return `
+        <section class="details-panel" aria-label="Статистика ${escapeHTML(config.label)}">
+          <div>
+            <p class="details-label">Модель</p>
+            <h4 class="full-model-name">${escapeHTML(fullName)}</h4>
+            <p class="details-note">${escapeHTML(model.note || 'Статистика этой версии сайта.')}</p>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span class="metric-value">${escapeHTML(revisions)}</span><span class="metric-label">Дополнительные правки</span></div>
+            <div class="metric"><span class="metric-value">${escapeHTML(duration)}</span><span class="metric-label">Время создания</span></div>
+            <div class="metric"><span class="metric-value">${escapeHTML(lines)}</span><span class="metric-label">Строк кода</span></div>
+            <div class="metric"><span class="metric-label">Символов в коде</span><div class="metric-inline"><span class="metric-value">${escapeHTML(chars)}</span><span class="metric-extra">${escapeHTML(averageCharactersPerLine)}</span></div></div>
+          </div>
+          <div class="details-actions">
+            <button class="action-button" type="button" data-action="show-prompt" data-test-id="${escapeHTML(test.id)}" ${promptExists ? '' : 'disabled'}>Показать промпт</button>
+            ${launchPath
+              ? `<a class="action-button primary" href="${launchPath}" target="_self">Запустить сайт</a>`
+              : '<button class="action-button primary" type="button" disabled>Файл не указан</button>'}
+          </div>
+        </section>`;
+    }
+
+    function setExpandedModel(card, modelKey) {
+      const testId = card.dataset.testCard;
+      const test = window.CONTEST_TESTS.find(item => item.id === testId);
+      if (!test) return;
+
+      const clickedButton = card.querySelector(`[data-action="toggle-model"][data-model-key="${modelKey}"]`);
+      const wasExpanded = clickedButton?.getAttribute('aria-expanded') === 'true';
+      card.querySelectorAll('.model-button').forEach(button => {
+        button.setAttribute('aria-expanded', 'false');
+        const state = button.querySelector('.button-state');
+        if (state && !button.disabled) state.textContent = 'Подробнее';
+      });
+      const slot = card.querySelector('.details-slot');
+
+      if (wasExpanded) {
+        slot.innerHTML = '';
+        return;
+      }
+
+      if (clickedButton) {
+        clickedButton.setAttribute('aria-expanded', 'true');
+        const state = clickedButton.querySelector('.button-state');
+        if (state) state.textContent = 'Скрыть';
+      }
+      slot.innerHTML = renderModelDetails(test, modelKey);
+    }
+
+    function openPrompt(test) {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.setAttribute('role', 'presentation');
+
+      const modal = document.createElement('section');
+      modal.className = 'prompt-modal';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-labelledby', 'prompt-modal-title');
+
+      const head = document.createElement('div');
+      head.className = 'modal-head';
+      head.innerHTML = `
+        <div>
+          <h3 class="modal-title" id="prompt-modal-title">Промпт для «${escapeHTML(test.title || test.id)}»</h3>
+          <p class="modal-subtitle">Одинаковое задание для всех моделей</p>
+        </div>
+        <button class="modal-close" type="button">Закрыть</button>`;
+
+      const prompt = document.createElement('pre');
+      prompt.className = 'prompt-text';
+      prompt.textContent = test.prompt || 'Промпт пока не добавлен в data.json.';
+
+      const foot = document.createElement('div');
+      foot.className = 'modal-foot';
+      foot.innerHTML = `
+        <span class="copy-status" aria-live="polite"></span>
+        <button class="action-button primary" type="button" data-action="copy-prompt">Скопировать промпт</button>`;
+
+      modal.append(head, prompt, foot);
+      backdrop.append(modal);
+      modalRoot.replaceChildren(backdrop);
+
+      const previousFocus = document.activeElement;
+      let escapeHandler;
+      const close = () => {
+        modalRoot.replaceChildren();
+        if (escapeHandler) document.removeEventListener('keydown', escapeHandler);
+        if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+      };
+      head.querySelector('.modal-close').addEventListener('click', close);
+      backdrop.addEventListener('click', event => { if (event.target === backdrop) close(); });
+      foot.querySelector('[data-action="copy-prompt"]').addEventListener('click', async () => {
+        const status = foot.querySelector('.copy-status');
+        try {
+          await navigator.clipboard.writeText(test.prompt || '');
+          status.textContent = 'Промпт скопирован';
+        } catch (error) {
+          const temporary = document.createElement('textarea');
+          temporary.value = test.prompt || '';
+          temporary.style.position = 'fixed';
+          temporary.style.opacity = '0';
+          document.body.append(temporary);
+          temporary.select();
+          const copied = document.execCommand('copy');
+          temporary.remove();
+          status.textContent = copied ? 'Промпт скопирован' : 'Не удалось скопировать автоматически';
+        }
+      });
+      escapeHandler = event => { if (event.key === 'Escape') close(); };
+      document.addEventListener('keydown', escapeHandler);
+      head.querySelector('.modal-close').focus();
+    }
+
+    const statsSection = document.getElementById('stats-section');
+    const statsModalBackdrop = document.getElementById('stats-modal-backdrop');
+    const statsNavButton = document.getElementById('stats-nav-button');
+    const statsBackButton = document.getElementById('stats-back-button');
+    let statsPreviousFocus = null;
+    let statsPreviousScrollY = 0;
+    const statsTabs = document.getElementById('stats-tabs');
+    const statsContent = document.getElementById('stats-content');
+
+    function numericValue(value) {
+      if (value === null || value === undefined || value === '') return null;
+      const number = Number(value);
+      return Number.isFinite(number) && number >= 0 ? number : null;
+    }
+
+    function average(values) {
+      const valid = values.filter(value => value !== null && Number.isFinite(value));
+      return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
+    }
+
+    function formatAverage(value, suffix = '') {
+      return value === null ? '—' : `${value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}${suffix}`;
+    }
+
+    function getEntries(test) {
+      return Object.keys(MODEL_CONFIG).flatMap(key => {
+        const model = test.models?.[key];
+        if (!model || model.enabled === false) return [];
+        return [{ key, config: MODEL_CONFIG[key], model, test }];
+      });
+    }
+
+    function aggregateModel(entries) {
+      const values = field => entries.map(entry => numericValue(entry.model[field])).filter(value => value !== null);
+      const durations = values('durationSeconds');
+      return {
+        submissions: entries.length,
+        duration: average(durations),
+        revisions: average(values('revisions')),
+        lines: average(values('codeLines')),
+        chars: average(values('characters')),
+        avgCharsPerLine: average(entries.map(entry => {
+          const lines = numericValue(entry.model.codeLines);
+          const chars = numericValue(entry.model.characters);
+          return lines && chars !== null ? chars / lines : null;
+        }).filter(value => value !== null)),
+        totalDuration: durations.reduce((sum, value) => sum + value, 0),
+        totalLines: values('codeLines').reduce((sum, value) => sum + value, 0),
+        totalChars: values('characters').reduce((sum, value) => sum + value, 0),
+        totalRevisions: values('revisions').reduce((sum, value) => sum + value, 0)
+      };
+    }
+
+    function statCard(label, value, note = '') {
+      return `<div class="stats-card"><span class="stats-card-label">${escapeHTML(label)}</span><strong class="stats-card-value">${escapeHTML(value)}</strong>${note ? `<span class="stats-card-note">${escapeHTML(note)}</span>` : ''}</div>`;
+    }
+
+    function renderGeneralStats(tests) {
+      const entries = tests.flatMap(getEntries);
+      const totalDuration = entries.reduce((sum, entry) => sum + (numericValue(entry.model.durationSeconds) ?? 0), 0);
+      const totalRevisions = entries.reduce((sum, entry) => sum + (numericValue(entry.model.revisions) ?? 0), 0);
+      const totalLines = entries.reduce((sum, entry) => sum + (numericValue(entry.model.codeLines) ?? 0), 0);
+      const totalChars = entries.reduce((sum, entry) => sum + (numericValue(entry.model.characters) ?? 0), 0);
+      const durationCount = entries.filter(entry => numericValue(entry.model.durationSeconds) !== null).length;
+      const revisionsCount = entries.filter(entry => numericValue(entry.model.revisions) !== null).length;
+      const linesCount = entries.filter(entry => numericValue(entry.model.codeLines) !== null).length;
+      const charsCount = entries.filter(entry => numericValue(entry.model.characters) !== null).length;
+
+      const perModel = Object.keys(MODEL_CONFIG).map(key => {
+        const modelEntries = entries.filter(entry => entry.key === key);
+        return { key, config: MODEL_CONFIG[key], entries: modelEntries, stats: aggregateModel(modelEntries) };
+      }).filter(item => item.entries.length);
+
+      const fastest = perModel.filter(item => item.stats.duration !== null).sort((a,b) => a.stats.duration - b.stats.duration)[0];
+      const fewestEdits = perModel.filter(item => item.stats.revisions !== null).sort((a,b) => a.stats.revisions - b.stats.revisions)[0];
+      const mostLines = perModel.filter(item => item.stats.lines !== null).sort((a,b) => b.stats.lines - a.stats.lines)[0];
+
+      const rows = perModel.map(item => `
+        <div class="model-stat-row">
+          <div class="model-stat-name"><span class="model-dot" style="--model-color:${item.config.color}"></span><span>${escapeHTML(item.config.label)}</span></div>
+          <div class="model-stat-cell"><strong>${item.stats.submissions}</strong><small>работ</small></div>
+          <div class="model-stat-cell"><strong>${formatDurationCompact(item.stats.duration)}</strong><small>среднее время</small></div>
+          <div class="model-stat-cell"><strong>${formatAverage(item.stats.revisions)}</strong><small>среднее правок</small></div>
+          <div class="model-stat-cell"><strong>${formatAverage(item.stats.lines)}</strong><small>среднее строк</small></div>
+        </div>`).join('');
+
+      const insights = [
+        fastest ? `<div class="stats-insight"><span class="stats-insight-label">Самое быстрое среднее время</span><strong class="stats-insight-value">${escapeHTML(fastest.config.label)}</strong><span class="stats-insight-note">${formatDurationCompact(fastest.stats.duration)} на одну работу</span></div>` : '',
+        fewestEdits ? `<div class="stats-insight"><span class="stats-insight-label">Меньше всего правок в среднем</span><strong class="stats-insight-value">${escapeHTML(fewestEdits.config.label)}</strong><span class="stats-insight-note">${formatAverage(fewestEdits.stats.revisions)} правки на одну работу</span></div>` : '',
+        mostLines ? `<div class="stats-insight"><span class="stats-insight-label">Наибольший средний объём кода</span><strong class="stats-insight-value">${escapeHTML(mostLines.config.label)}</strong><span class="stats-insight-note">${formatAverage(mostLines.stats.lines)} строк на одну работу</span></div>` : ''
+      ].filter(Boolean).join('');
+
+      return `
+        <div class="stats-overview">
+          ${statCard('Всего режимов', String(tests.length), 'Загружено из tests/index.json')}
+          ${statCard('Работ моделей', String(entries.length), `${perModel.length} моделей с данными`)}
+          ${statCard('Суммарное время', durationCount ? formatDurationCompact(totalDuration) : '—', `${durationCount} результатов с указанным временем`)}
+          ${statCard('Дополнительные правки', formatNumber(totalRevisions), `${revisionsCount} результатов с указанными правками`)}
+          ${statCard('Всего строк кода', formatNumber(totalLines), `${linesCount} результатов с указанным объёмом`)}
+          ${statCard('Всего символов', formatNumber(totalChars), `${charsCount} результатов с указанным объёмом`)}
+          ${statCard('Среднее время на работу', durationCount ? formatDurationCompact(totalDuration / durationCount) : '—', 'Только результаты с заполненным временем')}
+          ${statCard('Среднее число правок', revisionsCount ? formatAverage(totalRevisions / revisionsCount) : '—', 'Только результаты с заполненными правками')}
+        </div>
+        <h3 class="stats-subheading">Сравнение нейросетей</h3>
+        ${rows ? `<div class="model-stat-list">${rows}</div>` : '<div class="empty-state">Пока нет результатов для сравнения.</div>'}
+        ${insights ? `<h3 class="stats-subheading">Интересные показатели</h3><div class="stats-insights">${insights}</div>` : ''}
+        <p class="stats-footnote">Показатели рассчитаны автоматически по заполненным полям data.json. Меньшее время, число правок или объём кода сами по себе не означают более высокое качество сайта.</p>`;
+    }
+
+    function renderModeStats(test) {
+      const entries = getEntries(test);
+      const times = entries.map(entry => numericValue(entry.model.durationSeconds)).filter(value => value !== null);
+      const totalRevisions = entries.reduce((sum, entry) => sum + (numericValue(entry.model.revisions) ?? 0), 0);
+      const cards = entries.map(entry => {
+        const model = entry.model;
+        const lines = numericValue(model.codeLines);
+        const chars = numericValue(model.characters);
+        const averageLine = lines && chars !== null ? formatAverage(chars / lines) : '—';
+        return `
+          <article class="mode-model-card">
+            <h4 class="mode-model-title"><span class="model-dot" style="--model-color:${entry.config.color}"></span>${escapeHTML(entry.config.label)}</h4>
+            <p class="mode-model-full">${escapeHTML(model.fullModel || entry.config.label)}</p>
+            <div class="mode-metrics">
+              <div class="mode-metric"><strong>${model.durationSeconds == null ? '—' : escapeHTML(formatDurationCompact(model.durationSeconds))}</strong><small>Время создания</small></div>
+              <div class="mode-metric"><strong>${model.revisions == null ? '—' : escapeHTML(formatNumber(model.revisions))}</strong><small>Дополнительные правки</small></div>
+              <div class="mode-metric"><strong>${model.codeLines == null ? '—' : escapeHTML(formatNumber(model.codeLines))}</strong><small>Строк кода</small></div>
+              <div class="mode-metric"><strong>${model.characters == null ? '—' : escapeHTML(formatNumber(model.characters))}</strong><small>Символов в коде</small></div>
+              <div class="mode-metric"><strong>${averageLine}</strong><small>Символов на строку в среднем</small></div>
+            </div>
+          </article>`;
+      }).join('');
+      const fastestEntry = entries.filter(entry => numericValue(entry.model.durationSeconds) !== null).sort((a,b) => numericValue(a.model.durationSeconds) - numericValue(b.model.durationSeconds))[0];
+      return `
+        <p class="mode-stats-intro">${escapeHTML(test.description || 'Статистика результатов этого режима.')}</p>
+        <div class="stats-overview">
+          ${statCard('Участвует моделей', String(entries.length), 'С заполненными данными')}
+          ${statCard('Суммарное время', times.length ? formatDurationCompact(times.reduce((sum,value) => sum + value, 0)) : '—', `${times.length} результатов со временем`)}
+          ${statCard('Всего правок', formatNumber(totalRevisions), 'Сумма дополнительных правок')}
+          ${statCard('Самое быстрое создание', fastestEntry ? formatDurationCompact(fastestEntry.model.durationSeconds) : '—', fastestEntry ? fastestEntry.config.label : 'Нет данных о времени')}
+        </div>
+        <h3 class="stats-subheading">Результаты по моделям</h3>
+        ${cards ? `<div class="mode-model-grid">${cards}</div>` : '<div class="empty-state">Для этого режима пока нет добавленных моделей.</div>'}
+        <p class="stats-footnote">Данные берутся из tests/${escapeHTML(test.id)}/data.json. Пустые поля не учитываются в агрегированных расчётах.</p>`;
+    }
+
+    function renderStatsTab(tabId) {
+      const tests = window.CONTEST_TESTS || [];
+      const isGeneral = tabId === 'general';
+      const test = isGeneral ? null : tests.find(item => item.id === tabId);
+      statsTabs.querySelectorAll('.stats-tab').forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.statsTab === tabId)));
+      statsContent.innerHTML = test ? renderModeStats(test) : renderGeneralStats(tests);
+    }
+
+    function buildStatsTabs() {
+      const tests = window.CONTEST_TESTS || [];
+      statsTabs.innerHTML = [
+        `<button class="stats-tab" type="button" role="tab" data-stats-tab="general" aria-selected="true">Общая статистика</button>`,
+        ...tests.map(test => `<button class="stats-tab" type="button" role="tab" data-stats-tab="${escapeHTML(test.id)}" aria-selected="false">${escapeHTML(test.title || test.id)}</button>`)
+      ].join('');
+      renderStatsTab('general');
+    }
+
+    function showStats() {
+      if (!statsModalBackdrop.hidden) return;
+      statsPreviousFocus = document.activeElement;
+      statsPreviousScrollY = window.scrollY;
+      buildStatsTabs();
+      statsModalBackdrop.hidden = false;
+      document.body.style.overflow = 'hidden';
+      statsNavButton.setAttribute('aria-expanded', 'true');
+      statsNavButton.textContent = 'Закрыть';
+      statsBackButton.focus();
+    }
+
+    function hideStats() {
+      if (statsModalBackdrop.hidden) return;
+      statsModalBackdrop.hidden = true;
+      document.body.style.overflow = rulesModalBackdrop && !rulesModalBackdrop.hidden ? 'hidden' : '';
+      statsNavButton.setAttribute('aria-expanded', 'false');
+      statsNavButton.textContent = 'Статистика';
+      window.scrollTo(0, statsPreviousScrollY);
+      if (statsPreviousFocus && typeof statsPreviousFocus.focus === 'function') {
+        statsPreviousFocus.focus();
+      }
+    }
+
+    statsNavButton.addEventListener('click', () => statsModalBackdrop.hidden ? showStats() : hideStats());
+    statsBackButton.addEventListener('click', hideStats);
+    statsModalBackdrop.addEventListener('click', event => {
+      if (event.target === statsModalBackdrop) hideStats();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !statsModalBackdrop.hidden) hideStats();
+    });
+    statsTabs.addEventListener('click', event => {
+      const tab = event.target.closest('[data-stats-tab]');
+      if (tab) renderStatsTab(tab.dataset.statsTab);
+    });
+
+    const rulesModalBackdrop = document.getElementById('rules-modal-backdrop');
+    const rulesNavButton = document.getElementById('rules-nav-button');
+    const rulesCloseButton = document.getElementById('rules-close-button');
+    let rulesPreviousFocus = null;
+    let rulesPreviousScrollY = 0;
+
+    function showRules() {
+      if (!rulesModalBackdrop.hidden) return;
+      rulesPreviousFocus = document.activeElement;
+      rulesPreviousScrollY = window.scrollY;
+      rulesModalBackdrop.hidden = false;
+      document.body.style.overflow = 'hidden';
+      rulesNavButton.setAttribute('aria-expanded', 'true');
+      rulesCloseButton.focus();
+    }
+
+    function hideRules() {
+      if (rulesModalBackdrop.hidden) return;
+      rulesModalBackdrop.hidden = true;
+      document.body.style.overflow = statsModalBackdrop.hidden ? '' : 'hidden';
+      rulesNavButton.setAttribute('aria-expanded', 'false');
+      window.scrollTo(0, rulesPreviousScrollY);
+      if (rulesPreviousFocus && typeof rulesPreviousFocus.focus === 'function') {
+        rulesPreviousFocus.focus();
+      }
+    }
+
+    rulesNavButton.addEventListener('click', showRules);
+    rulesCloseButton.addEventListener('click', hideRules);
+    rulesModalBackdrop.addEventListener('click', event => {
+      if (event.target === rulesModalBackdrop) hideRules();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !rulesModalBackdrop.hidden) hideRules();
+    });
+
+    testsList.addEventListener('click', event => {
+      const button = event.target.closest('button[data-action]');
+      if (!button || button.disabled) return;
+
+      const action = button.dataset.action;
+      const testId = button.dataset.testId;
+      const test = window.CONTEST_TESTS.find(item => item.id === testId);
+      if (!test) return;
+
+      if (action === 'toggle-model') {
+        setExpandedModel(button.closest('[data-test-card]'), button.dataset.modelKey);
+      } else if (action === 'show-prompt') {
+        openPrompt(test);
+      }
+    });
+
+    async function loadTests() {
+      try {
+        const manifestResponse = await fetch('tests/index.json');
+        if (!manifestResponse.ok) throw new Error(`Не удалось загрузить tests/index.json (${manifestResponse.status})`);
+        const manifest = await manifestResponse.json();
+        if (!Array.isArray(manifest.tests)) throw new Error('В tests/index.json должен быть массив "tests".');
+
+        const ids = manifest.tests
+          .map(entry => typeof entry === 'string' ? entry : entry?.id)
+          .filter(id => typeof id === 'string' && /^[a-zA-Z0-9_-]+$/.test(id));
+
+        const results = await Promise.all(ids.map(async id => {
+          try {
+            const response = await fetch(`tests/${encodeURIComponent(id)}/data.json`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            data.id = id;
+            return { ok: true, data };
+          } catch (error) {
+            return { ok: false, id, error };
+          }
+        }));
+
+        const validTests = results.filter(result => result.ok).map(result => result.data);
+        window.CONTEST_TESTS = validTests;
+        testCount.textContent = String(validTests.length).padStart(2, '0');
+
+        const failed = results.filter(result => !result.ok);
+        const cards = validTests.map(renderTestCard);
+        if (failed.length) {
+          cards.push(`<div class="error-state"><strong>Некоторые тесты не загрузились</strong>${failed.map(item => escapeHTML(item.id)).join(', ')}. Проверь наличие data.json и корректность JSON.</div>`);
+        }
+        testsList.innerHTML = cards.length
+          ? cards.join('')
+          : '<div class="empty-state">Пока нет добавленных тестов. Создай папку в tests и добавь её название в tests/index.json.</div>';
+      } catch (error) {
+        console.error('AI BATTLE BY FATMATILDA:', error);
+        testCount.textContent = '00';
+        testsList.innerHTML = `<div class="error-state"><strong>Не удалось загрузить тесты</strong>${escapeHTML(error.message)}<br>Открой сайт через локальный сервер или GitHub Pages, а не напрямую через file://.</div>`;
+      }
+    }
+
+    window.CONTEST_TESTS = [];
+    loadTests();
+  </script>
+</body>
+</html>

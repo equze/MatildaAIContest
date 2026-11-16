@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Fireball</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: grab;
+  }
+  canvas:active { cursor: grabbing; }
+
+  .ui-btn {
+    position: fixed;
+    z-index: 10;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding: 10px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 16px;
+    text-decoration: none;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    font-family: inherit;
+  }
+  #back { left: 12px; }
+  #modeBtn { right: 12px; }
+
+  #menu {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(0, 0, 0, 0.72);
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  #menu.hidden { display: none; }
+  #menu h1 {
+    margin: 0 0 10px;
+    color: #fff;
+    font-size: clamp(36px, 9vw, 56px);
+    letter-spacing: 4px;
+    text-shadow: 0 0 18px #ff6a00, 0 0 40px #ff2000;
+  }
+  .mode {
+    width: min(280px, 80vw);
+    padding: 16px 20px;
+    border: none;
+    border-radius: 16px;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+    transition: transform 0.12s;
+  }
+  .mode:active { transform: scale(0.97); }
+  .mode b { display: block; font-size: 22px; }
+  .mode span { font-size: 14px; opacity: 0.85; }
+  .m-basic { background: linear-gradient(135deg, #ff9a00, #ff3d00); }
+  .m-ultra { background: linear-gradient(135deg, #ff1744, #5a0000); }
+  .m-crazy { background: linear-gradient(135deg, #ff00e6, #00e5ff, #ffea00); }
+  #hint {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    margin-top: 8px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<a href="../../index.html" class="ui-btn" id="back">← Назад</a>
+<button class="ui-btn" id="modeBtn">⚙ Режим</button>
+
+<canvas id="c"></canvas>
+
+<div id="menu">
+  <h1>FIREBALL</h1>
+  <button class="mode m-basic" data-mode="basic"><b>Basic</b><span>Классика: огонь и отскоки</span></button>
+  <button class="mode m-ultra" data-mode="ultra"><b>Ultra</b><span>Большой шар, красный ад, мощная тряска</span></button>
+  <button class="mode m-crazy" data-mode="crazy"><b>Crazy</b><span>Радуга, цветные взрывы и хаос</span></button>
+  <div id="hint">Веди шарик пальцем или мышью, отпусти — и он полетит</div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const menu = document.getElementById('menu');
+  const modeBtn = document.getElementById('modeBtn');
+
+  const MODES = {
+    basic: { name: 'Basic', radius: 0.06, rest: 0.66, friction: 0.992, shakeK: 1,   flame: 1,   ultra: false, crazy: false },
+    ultra: { name: 'Ultra', radius: 0.11, rest: 0.84, friction: 0.994, shakeK: 2.4, flame: 1.9, ultra: true,  crazy: false },
+    crazy: { name: 'Crazy', radius: 0.07, rest: 0.74, friction: 0.992, shakeK: 1.5, flame: 1.5, ultra: false, crazy: true  }
+  };
+
+  let W = 0, H = 0, DPR = 1;
+  let mode = MODES.basic;
+  let MAXV = 60;
+  let started = false;
+  let menuOpen = true;
+
+  const ball = { x: 0, y: 0, vx: 0, vy: 0 };
+  let dragging = false;
+  let px = 0, py = 0;
+  let lastMove = 0;
+  let rvx = 0, rvy = 0;
+
+  let particles = [];
+  let sparks = [];
+  let rings = [];
+  let trail = [];
+  let shake = 0;
+  let flash = 0;
+  let hue = 0;
+  let lastT = performance.now();
+
+  const MAX_PARTICLES = 450;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const R = () => Math.min(W, H) * mode.radius;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    MAXV = Math.max(W, H) * 0.1;
+    if (!started) {
+      ball.x = W / 2;
+      ball.y = H / 2;
+    }
+    const r = R();
+    ball.x = clamp(ball.x, r, W - r);
+    ball.y = clamp(ball.y, r, H - r);
+  }
+  window.addEventListener('resize', resize);
+
+  /* ---------- Ввод: мышь и касания через pointer events ---------- */
+  canvas.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    dragging = true;
+    started = true;
+    canvas.setPointerCapture(e.pointerId);
+    px = e.clientX;
+    py = e.clientY;
+    lastMove = performance.now();
+    rvx = rvy = 0;
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    px = e.clientX;
+    py = e.clientY;
+    lastMove = performance.now();
+  });
+  const release = e => {
+    if (!dragging) return;
+    dragging = false;
+    ball.vx = clamp(rvx, -MAXV, MAXV);
+    ball.vy = clamp(rvy, -MAXV, MAXV);
+  };
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+
+  /* ---------- Меню и режимы ---------- */
+  function openMenu() {
+    menuOpen = true;
+    menu.classList.remove('hidden');
+  }
+  function closeMenu() {
+    menuOpen = false;
+    menu.classList.add('hidden');
+  }
+  modeBtn.addEventListener('click', openMenu);
+  menu.addEventListener('click', e => {
+    const btn = e.target.closest('.mode');
+    if (btn) {
+      setMode(btn.dataset.mode);
+      closeMenu();
+    } else if (e.target === menu && started) {
+      closeMenu();
+    }
+  });
+
+  function setMode(key) {
+    mode = MODES[key];
+    particles = [];
+    sparks = [];
+    rings = [];
+    trail = [];
+    ball.vx = ball.vy = 0;
+    resize();
+  }
+
+  /* ---------- Физика ---------- */
+  function onHit(x, y, impact, nx, ny) {
+    const s = clamp(impact / MAXV, 0, 1);
+    shake = Math.max(shake, s * 1.1 * mode.shakeK);
+    if (mode.ultra) flash = Math.max(flash, s);
+
+    const count = Math.round((8 + s * 28) * mode.flame);
+    const baseAng = Math.atan2(ny, nx);
+    for (let i = 0; i < count; i++) {
+      const a = baseAng + rnd(-1.3, 1.3);
+      const sp = rnd(2, 5 + s * 14) * (0.6 + mode.flame * 0.4);
+      sparks.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        life: 0,
+        max: rnd(18, 34),
+        size: rnd(2, 4 + s * 5) * mode.flame,
+        rot: rnd(0, Math.PI * 2),
+        rv: rnd(-0.3, 0.3),
+        c: mode.crazy ? (hue + rnd(0, 360)) % 360 : null
+      });
+    }
+
+    const ringCount = mode.crazy ? 3 : 1;
+    for (let i = 0; i < ringCount; i++) {
+      rings.push({
+        x, y,
+        r0: R() * 0.4,
+        rMax: R() * (2.5 + s * 4) * mode.flame,
+        life: -i * 3,
+        max: 24 + i * 4,
+        h: (hue + i * 90 + rnd(0, 40)) % 360
+      });
+    }
+  }
+
+  function bounceWalls(active) {
+    const r = R();
+    const check = (impact, nx, ny) => {
+      if (active && impact > 0.8) onHit(ball.x, ball.y, impact, nx, ny);
+    };
+    if (ball.x < r) {
+      ball.x = r;
+      if (ball.vx < 0) {
+        const imp = -ball.vx;
+        if (active) ball.vx = -ball.vx * mode.rest;
+        check(imp, 1, 0);
+      }
+    } else if (ball.x > W - r) {
+      ball.x = W - r;
+      if (ball.vx > 0) {
+        const imp = ball.vx;
+        if (active) ball.vx = -ball.vx * mode.rest;
+        check(imp, -1, 0);
+      }
+    }
+    if (ball.y < r) {
+      ball.y = r;
+      if (ball.vy < 0) {
+        const imp = -ball.vy;
+        if (active) ball.vy = -ball.vy * mode.rest;
+        check(imp, 0, 1);
+      }
+    } else if (ball.y > H - r) {
+      ball.y = H - r;
+      if (ball.vy > 0) {
+        const imp = ball.vy;
+        if (active) ball.vy = -ball.vy * mode.rest;
+        check(imp, 0, -1);
+      }
+    }
+  }
+
+  function step(dt) {
+    if (dragging) {
+      const k = 1 - Math.pow(0.65, dt);
+      const ox = ball.x, oy = ball.y;
+      ball.x += (px - ball.x) * k;
+      ball.y += (py - ball.y) * k;
+      const dvx = (ball.x - ox) / dt;
+      const dvy = (ball.y - oy) / dt;
+      rvx = rvx * 0.6 + dvx * 0.4;
+      rvy = rvy * 0.6 + dvy * 0.4;
+      if (performance.now() - lastMove > 100) { rvx = 0; rvy = 0; }
+      ball.vx = rvx;
+      ball.vy = rvy;
+      bounceWalls(false);
+    } else {
+      const fr = Math.pow(mode.friction, dt);
+      ball.vx *= fr;
+      ball.vy *= fr;
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+      bounceWalls(true);
+      if (Math.hypot(ball.vx, ball.vy) < 0.08) {
+        ball.vx = 0;
+        ball.vy = 0;
+      }
+    }
+  }
+
+  /* ---------- Эффекты: пламя, след, искры, кольца ---------- */
+  function flameColor(t, p) {
+    if (mode.crazy) {
+      return `hsla(${p.h}, 100%, ${70 - t * 40}%, ${1 - t})`;
+    }
+    if (mode.ultra) {
+      if (t < 0.3) return `hsla(20, 100%, 80%, ${1 - t})`;
+      if (t < 0.7) return `hsla(5, 100%, 50%, ${1 - t})`;
+      return `hsla(0, 0%, 20%, ${(1 - t) * 0.7})`;
+    }
+    if (t < 0.25) return `hsla(52, 100%, 82%, ${1 - t})`;
+    if (t < 0.6) return `hsla(30, 100%, 55%, ${1 - t})`;
+    if (t < 0.85) return `hsla(12, 100%, 42%, ${1 - t})`;
+    return `hsla(0, 0%, 25%, ${(1 - t) * 0.6})`;
+  }
+
+  function emitFlame(vx, vy, dt) {
+    const sp = Math.hypot(vx, vy);
+    const f = clamp(sp / MAXV, 0, 1);
+    if (f < 0.03 || particles.length > MAX_PARTICLES) return;
+    const dx = vx / sp, dy = vy / sp;
+    const r = R();
+    const n = Math.ceil(f * 4 * mode.flame * dt);
+    for (let i = 0; i < n; i++) {
+      const back = r * rnd(0.4, 0.9);
+      const spread = r * 0.8;
+      particles.push({
+        x: ball.x - dx * back + rnd(-spread, spread) * -dy * 0.5,
+        y: ball.y - dy * back + rnd(-spread, spread) * dx * 0.5,
+        vx: -dx * sp * 0.12 + rnd(-1, 1),
+        vy: -dy * sp * 0.12 - rnd(0.2, 1.2),
+        life: 0,
+        max: rnd(16, 30) * (0.7 + mode.flame * 0.3),
+        size: r * rnd(0.35, 0.7) * (0.5 + f * 0.9) * mode.flame,
+        h: mode.crazy ? (hue + rnd(0, 180)) % 360 : 0
+      });
+    }
+  }
+
+  function updateEffects(dt, vx, vy) {
+    const sp = Math.hypot(vx, vy);
+    const f = clamp(sp / MAXV, 0, 1);
+
+    emitFlame(vx, vy, dt);
+
+    if (sp > 1.5) {
+      trail.push({ x: ball.x, y: ball.y });
+      const cap = mode.ultra ? 60 : 45;
+      while (trail.length > cap) trail.shift();
+    } else if (trail.length) {
+      trail.shift();
+    }
+
+    for (const p of particles) {
+      p.life += dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      const k = Math.pow(0.96, dt);
+      p.vx *= k;
+      p.vy *= k;
+      p.vy -= 0.04 * dt;
+    }
+    particles = particles.filter(p => p.life < p.max);
+
+    for (const s of sparks) {
+      s.life += dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.vx *= Math.pow(0.95, dt);
+      s.vy *= Math.pow(0.95, dt);
+      s.vy += 0.12 * dt;
+      s.rot += s.rv * dt;
+    }
+    sparks = sparks.filter(s => s.life < s.max);
+
+    for (const rg of rings) rg.life += dt;
+    rings = rings.filter(rg => rg.life < rg.max);
+
+    shake *= Math.pow(0.9, dt);
+    if (shake < 0.01) shake = 0;
+    flash *= Math.pow(0.9, dt);
+    return f;
+  }
+
+  /* ---------- Отрисовка ---------- */
+  function drawBackground(f) {
+    let g;
+    if (mode.crazy) {
+      g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, `hsl(${hue}, 85%, 14%)`);
+      g.addColorStop(0.5, `hsl(${(hue + 90) % 360}, 90%, ${18 + f * 12}%)`);
+      g.addColorStop(1, `hsl(${(hue + 200) % 360}, 90%, 22%)`);
+    } else if (mode.ultra) {
+      const red = Math.round(50 + f * 110 + flash * 80);
+      g = ctx.createRadialGradient(ball.x, ball.y, 10, W / 2, H / 2, Math.max(W, H) * 0.8);
+      g.addColorStop(0, `rgb(${Math.min(255, red + 60)}, 10, 10)`);
+      g.addColorStop(1, `rgb(${red}, 0, 0)`);
+    } else {
+      g = ctx.createRadialGradient(ball.x, ball.y, 10, W / 2, H / 2, Math.max(W, H) * 0.8);
+      g.addColorStop(0, `rgb(${Math.round(30 + f * 50)}, 10, 6)`);
+      g.addColorStop(1, '#050205');
+    }
+    ctx.fillStyle = g;
+    ctx.fillRect(-80, -80, W + 160, H + 160);
+  }
+
+  function drawRings() {
+    for (const rg of rings) {
+      if (rg.life < 0) continue;
+      const t = rg.life / rg.max;
+      const rad = rg.r0 + (rg.rMax - rg.r0) * t;
+      const alpha = (1 - t) * 0.9;
+      ctx.lineWidth = Math.max(1, R() * 0.12 * (1 - t));
+      ctx.strokeStyle = mode.crazy
+        ? `hsla(${rg.h}, 100%, 65%, ${alpha})`
+        : mode.ultra
+          ? `rgba(255, 60, 40, ${alpha})`
+          : `rgba(255, 170, 60, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(rg.x, rg.y, rad, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  function drawTrail(f) {
+    const n = trail.length;
+    if (n < 2) return;
+    const r = R();
+    for (let i = 1; i < n; i++) {
+      const a = trail[i - 1], b = trail[i];
+      const t = i / n;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = r * (0.2 + f * 1.1) * t * (mode.ultra ? 1.6 : 1);
+      if (mode.crazy) {
+        ctx.strokeStyle = `hsla(${(hue + i * 6) % 360}, 100%, 60%, ${t * 0.7})`;
+      } else if (mode.ultra) {
+        ctx.strokeStyle = `rgba(255, ${Math.round(60 + t * 120)}, 30, ${t * 0.6})`;
+      } else {
+        ctx.strokeStyle = `rgba(255, ${Math.round(90 + t * 130)}, 20, ${t * 0.55})`;
+      }
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+  }
+
+  function drawFlames() {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of particles) {
+      const t = p.life / p.max;
+      const rad = p.size * (1 + t * 0.6) * (1 - t * 0.7);
+      if (rad < 0.3) continue;
+      ctx.fillStyle = flameColor(t, p);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawBall(f) {
+    const r = R();
+    const x = ball.x, y = ball.y;
+
+    // Свечение
+    const glowR = r * (2 + f * 2.5) * (mode.ultra ? 1.3 : 1);
+    const glow = ctx.createRadialGradient(x, y, r * 0.5, x, y, glowR);
+    if (mode.crazy) {
+      glow.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.9)`);
+      glow.addColorStop(0.45, `hsla(${(hue + 120) % 360}, 100%, 55%, 0.45)`);
+      glow.addColorStop(1, `hsla(${(hue + 240) % 360}, 100%, 50%, 0)`);
+    } else if (mode.ultra) {
+      glow.addColorStop(0, 'rgba(255, 90, 60, 0.95)');
+      glow.addColorStop(0.45, 'rgba(255, 20, 0, 0.5)');
+      glow.addColorStop(1, 'rgba(120, 0, 0, 0)');
+    } else {
+      glow.addColorStop(0, 'rgba(255, 220, 120, 0.9)');
+      glow.addColorStop(0.45, 'rgba(255, 100, 20, 0.45)');
+      glow.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, glowR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Ядро
+    const core = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, r * 0.1, x, y, r);
+    if (mode.crazy) {
+      core.addColorStop(0, `hsl(${hue}, 100%, 92%)`);
+      core.addColorStop(0.5, `hsl(${(hue + 60) % 360}, 100%, 58%)`);
+      core.addColorStop(1, `hsl(${(hue + 200) % 360}, 100%, 35%)`);
+    } else if (mode.ultra) {
+      core.addColorStop(0, '#fff3c4');
+      core.addColorStop(0.45, '#ff3b1f');
+      core.addColorStop(1, '#5a0000');
+    } else {
+      core.addColorStop(0, '#fff8d6');
+      core.addColorStop(0.5, '#ffb300');
+      core.addColorStop(1, '#ff3d00');
+    }
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawSparks() {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const s of sparks) {
+      const t = s.life / s.max;
+      const alpha = 1 - t;
+      if (mode.crazy) {
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.rot);
+        ctx.fillStyle = `hsla(${s.c}, 100%, 62%, ${alpha})`;
+        ctx.fillRect(-s.size, -s.size * 0.3, s.size * 2, s.size * 0.6);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = mode.ultra
+          ? `rgba(255, ${Math.round(80 + 140 * alpha)}, 40, ${alpha})`
+          : `rgba(255, ${Math.round(160 + 80 * alpha)}, 60, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, Math.max(0.5, s.size * (1 - t * 0.5)), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ---------- Главный цикл ---------- */
+  function frame(now) {
+    const dt = Math.min((now - lastT) / 16.667, 3);
+    lastT = now;
+    hue = (hue + dt * 1.6) % 360;
+
+    if (!menuOpen) {
+      step(dt);
+    }
+
+    const curVx = dragging ? rvx : ball.vx;
+    const curVy = dragging ? rvy : ball.vy;
+    const f = updateEffects(menuOpen ? 0 : dt, curVx, curVy);
+
+    const amp = shake * (mode.ultra ? 22 : 12);
+    const sx = amp ? rnd(-amp, amp) : 0;
+    const sy = amp ? rnd(-amp, amp) : 0;
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.save();
+    ctx.translate(sx, sy);
+    drawBackground(f);
+    drawRings();
+    drawTrail(f);
+    drawFlames();
+    drawBall(f);
+    drawSparks();
+    ctx.restore();
+
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  requestAnimationFrame(t => { lastT = t; frame(t); });
+})();
+</script>
+</body>
+</html>

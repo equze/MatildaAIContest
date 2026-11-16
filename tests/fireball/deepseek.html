@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#05060b" />
+<title>Fireball — огненный шарик</title>
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #05060b;
+    color: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #c {
+    position: fixed;
+    inset: 0;
+    display: block;
+    touch-action: none;
+    cursor: grab;
+  }
+  #c:active { cursor: grabbing; }
+
+  /* ---------- кнопка «Назад» ---------- */
+  .back {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    transition: background 0.18s ease, transform 0.1s ease;
+  }
+  .back:hover { background: rgba(255, 255, 255, 0.17); }
+  .back:active { transform: scale(0.94); }
+  .back .arrow { font-size: 17px; line-height: 1; }
+
+  /* ---------- переключатель режимов ---------- */
+  .modes {
+    position: fixed;
+    left: 50%;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+  }
+
+  .modes button {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.72);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 10px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  }
+  .modes button:active { transform: scale(0.93); }
+
+  .modes button.active {
+    background: rgba(255, 150, 45, 0.95);
+    color: #1a0a00;
+    box-shadow: 0 0 22px rgba(255, 130, 30, 0.55);
+  }
+  .modes button.active[data-mode="ultra"] {
+    background: linear-gradient(180deg, #ff6a3d, #e01b0c);
+    color: #fff;
+    box-shadow: 0 0 24px rgba(255, 60, 30, 0.7);
+  }
+  .modes button.active[data-mode="crazy"] {
+    background: linear-gradient(90deg, #ff3ba7, #ffd23b, #3bffd2, #6a5bff);
+    background-size: 300% 100%;
+    color: #12102b;
+    animation: crazyShift 2.4s linear infinite;
+    box-shadow: 0 0 24px rgba(255, 90, 220, 0.6);
+  }
+  @keyframes crazyShift {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+
+  /* ---------- подсказка ---------- */
+  .hint {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    pointer-events: none;
+    white-space: nowrap;
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .hint.hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+
+  @media (max-width: 380px) {
+    .modes button { padding: 9px 15px; font-size: 14px; }
+    .hint { font-size: 12px; padding: 7px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<a class="back" href="../../index.html"><span class="arrow">←</span> Назад</a>
+
+<div class="hint" id="hint">Тяни шарик пальцем или мышью</div>
+
+<div class="modes" id="modes">
+  <button data-mode="basic" class="active">Basic</button>
+  <button data-mode="ultra">Ultra</button>
+  <button data-mode="crazy">Crazy</button>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     Утилиты
+     ========================================================= */
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const TAU = Math.PI * 2;
+
+  /* =========================================================
+     Конфигурация режимов
+     ========================================================= */
+  const MODES = {
+    basic: {
+      radius: 24,
+      restitution: 0.72,   // сколько скорости остаётся после отскока
+      minLoss: 22,         // дополнительная потеря скорости за удар, px/s
+      shakeScale: 1.0,
+      particleRate: 1.0,
+      trailLen: 26,
+      maxParticles: 280,
+      flash: 0.55,
+      waves: 1
+    },
+    ultra: {
+      radius: 42,
+      restitution: 0.90,
+      minLoss: 42,
+      shakeScale: 2.6,
+      particleRate: 2.2,
+      trailLen: 36,
+      maxParticles: 520,
+      flash: 1.0,
+      waves: 2
+    },
+    crazy: {
+      radius: 30,
+      restitution: 0.84,
+      minLoss: 30,
+      shakeScale: 1.7,
+      particleRate: 1.6,
+      trailLen: 32,
+      maxParticles: 440,
+      flash: 0.85,
+      waves: 3
+    }
+  };
+
+  /* =========================================================
+     Спрайты свечения (рисуются один раз — быстро на мобилках)
+     ========================================================= */
+  const SPRITE_SIZE = 128;
+
+  function makeGlow(stops) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = SPRITE_SIZE;
+    const g2 = cv.getContext('2d');
+    const grad = g2.createRadialGradient(
+      SPRITE_SIZE / 2, SPRITE_SIZE / 2, 0,
+      SPRITE_SIZE / 2, SPRITE_SIZE / 2, SPRITE_SIZE / 2
+    );
+    for (let i = 0; i < stops.length; i++) grad.addColorStop(stops[i][0], stops[i][1]);
+    g2.fillStyle = grad;
+    g2.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
+    return cv;
+  }
+
+  const FIRE_SPRITE = makeGlow([
+    [0.00, 'rgba(255,255,255,1)'],
+    [0.18, 'rgba(255,244,178,0.96)'],
+    [0.42, 'rgba(255,176,44,0.72)'],
+    [0.68, 'rgba(255,92,10,0.36)'],
+    [1.00, 'rgba(255,40,0,0)']
+  ]);
+
+  const CRAZY_SPRITES = [];
+  for (let i = 0; i < 12; i++) {
+    const h = i * 30;
+    CRAZY_SPRITES.push(makeGlow([
+      [0.00, 'hsla(' + h + ',100%,94%,1)'],
+      [0.25, 'hsla(' + ((h + 18) % 360) + ',100%,70%,0.92)'],
+      [0.55, 'hsla(' + ((h + 52) % 360) + ',100%,56%,0.5)'],
+      [1.00, 'hsla(' + ((h + 90) % 360) + ',100%,50%,0)']
+    ]));
+  }
+
+  /* =========================================================
+     Canvas
+     ========================================================= */
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let W = 1, H = 1, DPR = 1;
+
+  /* =========================================================
+     Состояние
+     ========================================================= */
+  const state = {
+    mode: 'basic',
+    ball: { x: 0, y: 0, vx: 0, vy: 0, r: MODES.basic.radius },
+    prevX: 0,
+    prevY: 0,
+    dragging: false,
+    pointer: { x: 0, y: 0 },
+    trail: [],
+    particles: [],
+    waves: [],
+    shake: 0,
+    flash: 0,
+    time: 0,
+    spawnAcc: 0
+  };
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, window.innerWidth);
+    H = Math.max(1, window.innerHeight);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    const b = state.ball;
+    b.r = MODES[state.mode].radius;
+    b.x = clamp(b.x || W / 2, b.r, Math.max(b.r, W - b.r));
+    b.y = clamp(b.y || H / 2, b.r, Math.max(b.r, H - b.r));
+  }
+
+  function resetBall() {
+    const b = state.ball;
+    b.x = W / 2;
+    b.y = H / 2;
+    b.vx = 0;
+    b.vy = 0;
+    b.r = MODES[state.mode].radius;
+    state.prevX = b.x;
+    state.prevY = b.y;
+    state.trail.length = 0;
+    state.particles.length = 0;
+    state.pointer.x = b.x;
+    state.pointer.y = b.y;
+  }
+
+  /* =========================================================
+     Ввод
+     ========================================================= */
+  const hintEl = document.getElementById('hint');
+  let hintHidden = false;
+  function hideHint() {
+    if (hintHidden) return;
+    hintHidden = true;
+    hintEl.classList.add('hidden');
+    setTimeout(() => { if (hintEl.parentNode) hintEl.parentNode.removeChild(hintEl); }, 700);
+  }
+
+  function setPointerFromEvent(e) {
+    state.pointer.x = e.clientX;
+    state.pointer.y = e.clientY;
+  }
+
+  canvas.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    setPointerFromEvent(e);
+    state.dragging = true;
+    hideHint();
+  }, { passive: false });
+
+  canvas.addEventListener('pointermove', function (e) {
+    if (!state.dragging) return;
+    e.preventDefault();
+    setPointerFromEvent(e);
+  }, { passive: false });
+
+  function endDrag() {
+    state.dragging = false;
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', function () { /* держим за счёт capture */ });
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('blur', endDrag);
+
+  // Запрет прокрутки/зума жестами на канвасе
+  canvas.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+
+  /* =========================================================
+     Переключение режимов
+     ========================================================= */
+  const modeButtons = Array.prototype.slice.call(document.querySelectorAll('.modes button'));
+  modeButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const m = btn.dataset.mode;
+      if (!m || m === state.mode) return;
+      state.mode = m;
+      modeButtons.forEach(function (b) { b.classList.toggle('active', b === btn); });
+
+      const b = state.ball;
+      b.r = MODES[m].radius;
+      b.x = clamp(b.x, b.r, Math.max(b.r, W - b.r));
+      b.y = clamp(b.y, b.r, Math.max(b.r, H - b.r));
+
+      // приветственная волна при смене режима
+      const hue = m === 'crazy' ? Math.random() * 360 : (m === 'ultra' ? 8 : 34);
+      for (let i = 0; i < (m === 'crazy' ? 3 : 1); i++) {
+        state.waves.push({
+          x: b.x, y: b.y, t: 0,
+          dur: 0.55 + i * 0.12,
+          maxR: Math.max(W, H) * (0.45 + i * 0.18),
+          hue: m === 'crazy' ? Math.random() * 360 : hue
+        });
+      }
+      state.shake = Math.max(state.shake, m === 'ultra' ? 22 : 12);
+      state.flash = Math.min(1, state.flash + 0.35);
+
+      // немного огня
+      for (let i = 0; i < 26; i++) {
+        const a = Math.random() * TAU;
+        const sp = rand(80, 460);
+        const life = rand(0.3, 0.75);
+        state.particles.push({
+          x: b.x, y: b.y,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          r: rand(6, 20),
+          life: life,
+          maxLife: life,
+          hue: m === 'crazy' ? Math.random() * 360 : rand(15, 50)
+        });
+      }
+      hideHint();
+    });
+  });
+
+  /* =========================================================
+     Эффекты
+     ========================================================= */
+  function spawnParticle(b, speed, hue) {
+    const ang = Math.random() * TAU;
+    const dist = b.r * rand(0.25, 1.0);
+    const px = b.x + Math.cos(ang) * dist;
+    const py = b.y + Math.sin(ang) * dist;
+
+    const dir = Math.atan2(-b.vy, -b.vx) + rand(-0.9, 0.9);
+    const sp = rand(0.25, 1.05) * Math.min(speed, 2600) * 0.34;
+    const life = rand(0.25, 0.7);
+
+    state.particles.push({
+      x: px, y: py,
+      vx: Math.cos(dir) * sp + rand(-70, 70),
+      vy: Math.sin(dir) * sp + rand(-70, 70),
+      r: b.r * rand(0.25, 0.85),
+      life: life,
+      maxLife: life,
+      hue: (hue + rand(-40, 60) + 360) % 360
+    });
+  }
+
+  function onBounce(impact, cx, cy) {
+    const cfg = MODES[state.mode];
+    const power = clamp(impact / 1600, 0.08, 1.8);
+
+    // тряска
+    state.shake = Math.min(52, state.shake + power * 10 * cfg.shakeScale);
+    state.flash = Math.min(1, state.flash + power * 0.7 * cfg.flash);
+
+    // ударные волны
+    for (let i = 0; i < cfg.waves; i++) {
+      state.waves.push({
+        x: cx, y: cy, t: 0,
+        dur: 0.4 + i * 0.13,
+        maxR: (55 + power * 240) * (1 + i * 0.55),
+        hue: state.mode === 'crazy'
+          ? Math.random() * 360
+          : (state.mode === 'ultra' ? rand(0, 22) : rand(20, 48))
+      });
+    }
+
+    // искры
+    const mul = state.mode === 'ultra' ? 1.9 : state.mode === 'crazy' ? 1.5 : 1.0;
+    const count = Math.round((10 + power * 34) * mul);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * TAU;
+      const sp = rand(70, 470) * (0.6 + power);
+      const life = rand(0.22, 0.7);
+      state.particles.push({
+        x: cx, y: cy,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        r: rand(4, 15) * (state.mode === 'ultra' ? 1.55 : 1),
+        life: life,
+        maxLife: life,
+        hue: state.mode === 'crazy' ? Math.random() * 360 : rand(10, 50)
+      });
+    }
+
+    const max = cfg.maxParticles;
+    if (state.particles.length > max) {
+      state.particles.splice(0, state.particles.length - max);
+    }
+  }
+
+  /* =========================================================
+     Физика
+     ========================================================= */
+  function collide() {
+    const b = state.ball;
+    const cfg = MODES[state.mode];
+    const rest = cfg.restitution;
+
+    const spBefore = Math.hypot(b.vx, b.vy);
+    let hit = false;
+    let hx = b.x, hy = b.y;
+
+    if (b.x - b.r < 0 && b.vx < 0) {
+      b.x = b.r;
+      b.vx = -b.vx * rest;
+      hit = true; hx = 0;
+    } else if (b.x + b.r > W && b.vx > 0) {
+      b.x = W - b.r;
+      b.vx = -b.vx * rest;
+      hit = true; hx = W;
+    }
+
+    if (b.y - b.r < 0 && b.vy < 0) {
+      b.y = b.r;
+      b.vy = -b.vy * rest;
+      hit = true; hy = 0;
+    } else if (b.y + b.r > H && b.vy > 0) {
+      b.y = H - b.r;
+      b.vy = -b.vy * rest;
+      hit = true; hy = H;
+    }
+
+    if (!hit) return;
+
+    // дополнительная потеря скорости, чтобы шарик гарантированно останавливался
+    const sp = Math.hypot(b.vx, b.vy);
+    if (sp > 0.001) {
+      const ns = Math.max(0, sp - cfg.minLoss);
+      const k = ns / sp;
+      b.vx *= k;
+      b.vy *= k;
+    }
+
+    onBounce(spBefore, hx, hy);
+  }
+
+  function update(dt) {
+    const cfg = MODES[state.mode];
+    const b = state.ball;
+
+    state.prevX = b.x;
+    state.prevY = b.y;
+
+    /* --- ведение пальцем / мышью --- */
+    if (state.dragging) {
+      const follow = 1 - Math.exp(-dt * 24);
+      const px = b.x, py = b.y;
+
+      b.x += (state.pointer.x - b.x) * follow;
+      b.y += (state.pointer.y - b.y) * follow;
+
+      b.x = clamp(b.x, b.r, Math.max(b.r, W - b.r));
+      b.y = clamp(b.y, b.r, Math.max(b.r, H - b.r));
+
+      const ivx = (b.x - px) / dt;
+      const ivy = (b.y - py) / dt;
+
+      b.vx = b.vx * 0.45 + ivx * 0.55;
+      b.vy = b.vy * 0.45 + ivy * 0.55;
+
+      const sp = Math.hypot(b.vx, b.vy);
+      if (sp > 6000) { b.vx *= 6000 / sp; b.vy *= 6000 / sp; }
+    } else {
+      /* --- свободный полёт по инерции --- */
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      const drag = Math.exp(-dt * 0.18);
+      b.vx *= drag;
+      b.vy *= drag;
+
+      collide();
+
+      if (Math.hypot(b.vx, b.vy) < 22) {
+        b.vx = 0;
+        b.vy = 0;
+      }
+    }
+
+    /* --- фактическая (визуальная) скорость --- */
+    const visualSpeed = Math.hypot(b.x - state.prevX, b.y - state.prevY) / dt;
+    const hue = (state.time * 130) % 360;
+
+    /* --- огненный след --- */
+    if (visualSpeed > 45) {
+      state.trail.push({ x: b.x, y: b.y, r: b.r, spd: visualSpeed, hue: hue });
+      while (state.trail.length > cfg.trailLen) state.trail.shift();
+    } else if (state.trail.length) {
+      state.trail.shift();
+      if (state.trail.length) state.trail.shift();
+    }
+
+    /* --- порождение частиц огня --- */
+    if (visualSpeed > 60) {
+      state.spawnAcc += dt * (visualSpeed * 0.045) * cfg.particleRate;
+      let guard = 0;
+      while (state.spawnAcc >= 1 && guard++ < 40) {
+        state.spawnAcc -= 1;
+        spawnParticle(b, visualSpeed, hue);
+      }
+      if (state.particles.length > cfg.maxParticles) {
+        state.particles.splice(0, state.particles.length - cfg.maxParticles);
+      }
+    } else {
+      state.spawnAcc = 0;
+    }
+
+    /* --- частицы --- */
+    const parts = state.particles;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= dt;
+      if (p.life <= 0) {
+        parts[i] = parts[parts.length - 1];
+        parts.pop();
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      const d = Math.exp(-dt * 2.6);
+      p.vx *= d;
+      p.vy *= d;
+      p.vy -= 30 * dt; // огонь поднимается вверх
+    }
+
+    /* --- волны --- */
+    for (let i = state.waves.length - 1; i >= 0; i--) {
+      const w = state.waves[i];
+      w.t += dt / w.dur;
+      if (w.t >= 1) state.waves.splice(i, 1);
+    }
+
+    /* --- затухание тряски и вспышки --- */
+    state.shake *= Math.exp(-dt * 5.5);
+    if (state.shake < 0.3) state.shake = 0;
+    state.flash *= Math.exp(-dt * 6);
+    if (state.flash < 0.01) state.flash = 0;
+  }
+
+  /* =========================================================
+     Рендер
+     ========================================================= */
+  function spriteDraw(spr, x, y, r, alpha) {
+    if (r <= 0.4 || alpha <= 0.004) return;
+    ctx.globalAlpha = alpha > 1 ? 1 : alpha;
+    ctx.drawImage(spr, x - r, y - r, r * 2, r * 2);
+  }
+
+  function drawBackground() {
+    const t = state.time;
+    const cx = W * 0.5, cy = H * 0.5;
+    const rad = Math.max(W, H) * 0.8;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+
+    if (state.mode === 'ultra') {
+      g.addColorStop(0, '#5a0d0d');
+      g.addColorStop(0.5, '#2a0505');
+      g.addColorStop(1, '#0d0000');
+    } else if (state.mode === 'crazy') {
+      const h = (t * 45) % 360;
+      g.addColorStop(0, 'hsl(' + h + ', 78%, 17%)');
+      g.addColorStop(0.58, 'hsl(' + ((h + 75) % 360) + ', 82%, 9%)');
+      g.addColorStop(1, 'hsl(' + ((h + 150) % 360) + ', 86%, 4%)');
+    } else {
+      g.addColorStop(0, '#111625');
+      g.addColorStop(0.6, '#0a0d16');
+      g.addColorStop(1, '#05060b');
+    }
+
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // рамка «стен»
+    ctx.strokeStyle = state.mode === 'ultra'
+      ? 'rgba(255,70,40,0.30)'
+      : state.mode === 'crazy'
+        ? 'hsla(' + ((state.time * 90) % 360) + ',100%,65%,0.30)'
+        : 'rgba(120,160,255,0.14)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+  }
+
+  function drawWaves() {
+    const crazy = state.mode === 'crazy';
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < state.waves.length; i++) {
+      const w = state.waves[i];
+      const e = 1 - Math.pow(1 - w.t, 3);
+      const r = w.maxR * e;
+      const a = (1 - w.t) * 0.55;
+      const hue = crazy ? (w.hue + w.t * 200) % 360 : w.hue;
+
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, r, 0, TAU);
+      ctx.strokeStyle = 'hsla(' + hue + ',100%,62%,' + a + ')';
+      ctx.lineWidth = Math.max(1, (1 - w.t) * 9);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawTrail() {
+    const tr = state.trail;
+    const n = tr.length;
+    if (!n) return;
+    const crazy = state.mode === 'crazy';
+
+    for (let i = 0; i < n; i++) {
+      const p = tr[i];
+      const t = (i + 1) / n;
+      const spdN = Math.min(1, p.spd / 1500);
+      if (spdN < 0.03) continue;
+
+      const r = p.r * (0.30 + 0.95 * spdN) * (0.35 + 0.75 * t);
+      const a = (0.05 + 0.44 * spdN) * t * t;
+
+      let spr = FIRE_SPRITE;
+      if (crazy) {
+        const idx = Math.floor((((p.hue % 360) + 360) % 360) / 30) % 12;
+        spr = CRAZY_SPRITES[idx];
+      }
+      spriteDraw(spr, p.x, p.y, r, a);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawParticles() {
+    const crazy = state.mode === 'crazy';
+    const parts = state.particles;
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      const k = p.life / p.maxLife;
+      if (k <= 0) continue;
+      const a = k * k * 0.9;
+
+      let spr = FIRE_SPRITE;
+      if (crazy) {
+        const idx = Math.floor((((p.hue % 360) + 360) % 360) / 30) % 12;
+        spr = CRAZY_SPRITES[idx];
+      }
+      spriteDraw(spr, p.x, p.y, p.r * (0.4 + k * 0.9), a);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBall() {
+    const b = state.ball;
+    const crazy = state.mode === 'crazy';
+    const hue = crazy ? (state.time * 130) % 360 : 0;
+
+    const speed = Math.hypot(b.vx, b.vy);
+    const heat = Math.min(1, speed / 1600);
+
+    // внешнее свечение
+    ctx.globalCompositeOperation = 'lighter';
+    let spr = FIRE_SPRITE;
+    if (crazy) spr = CRAZY_SPRITES[Math.floor(hue / 30) % 12];
+    spriteDraw(spr, b.x, b.y, b.r * (2.3 + heat * 1.3), 0.52);
+    spriteDraw(spr, b.x, b.y, b.r * (1.35 + heat * 0.35), 0.9);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    // ядро
+    const g = ctx.createRadialGradient(
+      b.x - b.r * 0.35, b.y - b.r * 0.4, b.r * 0.05,
+      b.x, b.y, b.r
+    );
+    if (crazy) {
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.32, 'hsl(' + hue + ',100%,72%)');
+      g.addColorStop(0.75, 'hsl(' + ((hue + 55) % 360) + ',100%,58%)');
+      g.addColorStop(1, 'hsl(' + ((hue + 110) % 360) + ',100%,46%)');
+    } else {
+      g.addColorStop(0, '#fffdf2');
+      g.addColorStop(0.30, '#ffe373');
+      g.addColorStop(0.70, '#ff9d2e');
+      g.addColorStop(1, '#ff3d00');
+    }
+
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, TAU);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // блик
+    ctx.beginPath();
+    ctx.arc(b.x - b.r * 0.33, b.y - b.r * 0.36, b.r * 0.24, 0, TAU);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fill();
+  }
+
+  function drawFlash() {
+    if (state.flash <= 0.01) return;
+    const a = state.flash * 0.32;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = state.mode === 'ultra'
+      ? 'rgba(255,70,25,' + a + ')'
+      : state.mode === 'crazy'
+        ? 'hsla(' + ((state.time * 300) % 360) + ',100%,60%,' + a + ')'
+        : 'rgba(255,190,90,' + a + ')';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function render() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    drawBackground();
+
+    // тряска экрана
+    ctx.save();
+    const s = state.shake;
+    if (s > 0.15) {
+      ctx.translate((Math.random() * 2 - 1) * s, (Math.random() * 2 - 1) * s);
+    }
+
+    drawWaves();
+
+    ctx.globalCompositeOperation = 'lighter';
+    drawTrail();
+    drawParticles();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    drawBall();
+
+    ctx.restore();
+
+    drawFlash();
+  }
+
+  /* =========================================================
+     Главный цикл
+     ========================================================= */
+  let lastT = 0;
+
+  function loop(now) {
+    if (!lastT) lastT = now;
+    let dt = (now - lastT) / 1000;
+    lastT = now;
+
+    if (dt > 0.05) dt = 0.05;
+    if (dt < 0.0005) dt = 0.0005;
+
+    state.time += dt;
+    update(dt);
+    render();
+
+    requestAnimationFrame(loop);
+  }
+
+  /* =========================================================
+     Старт
+     ========================================================= */
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function () {
+    setTimeout(resize, 120);
+  });
+
+  resize();
+  resetBall();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

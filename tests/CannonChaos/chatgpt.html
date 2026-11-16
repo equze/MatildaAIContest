@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101323">
+<title>BLOCKFALL — испытание на прочность</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d1020;
+    --panel: rgba(20, 25, 45, .88);
+    --panel-2: rgba(28, 34, 58, .94);
+    --line: rgba(164, 180, 255, .15);
+    --muted: #8f9ab9;
+    --text: #f3f5ff;
+    --cyan: #69e2ee;
+    --violet: #a78bfa;
+    --orange: #ffbd72;
+  }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text);
+    background: radial-gradient(ellipse at 56% 5%, #222344 0%, #11162a 43%, #0a0d18 100%);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button, select, input { font: inherit; }
+  button { color: inherit; }
+  #app {
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    gap: 12px;
+  }
+  .topbar {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex: 0 0 auto;
+  }
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 40px;
+    padding: 0 15px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: rgba(25, 31, 53, .74);
+    color: #dce3ff;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 650;
+    transition: .2s ease;
+  }
+  .back:hover { background: rgba(53, 62, 99, .8); border-color: rgba(164,180,255,.34); transform: translateY(-1px); }
+  .back svg { width: 16px; height: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  .brand-mark {
+    width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px;
+    background: linear-gradient(135deg, #6de4e9, #8a8bfa 70%, #b17bff);
+    color: #101427; box-shadow: 0 0 24px rgba(107, 209, 237, .2);
+  }
+  .brand-mark svg { width: 19px; height: 19px; }
+  .brand-name { font-size: 13px; font-weight: 850; letter-spacing: .16em; }
+  .brand-sub { color: var(--muted); font-size: 9px; letter-spacing: .13em; margin-top: 2px; }
+  .top-status { display: flex; align-items: center; gap: 7px; padding: 8px 11px; border: 1px solid var(--line); background: rgba(19,24,42,.6); border-radius: 99px; color: #aeb8d4; font-size: 11px; white-space: nowrap; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #70dfb4; box-shadow: 0 0 9px #70dfb4; }
+
+  #scene-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 210px;
+    overflow: hidden;
+    border: 1px solid rgba(151, 170, 255, .15);
+    border-radius: 22px;
+    background: #10172a;
+    box-shadow: 0 20px 60px rgba(0,0,0,.23), inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  #game { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: crosshair; }
+  .scene-label {
+    position: absolute; top: 16px; left: 18px; pointer-events: none;
+    color: rgba(211,222,255,.63); font-size: 10px; font-weight: 750; letter-spacing: .18em;
+  }
+  .scene-hint {
+    position: absolute; right: 16px; top: 14px; pointer-events: none;
+    color: rgba(200,212,245,.56); font-size: 10px; letter-spacing: .04em;
+  }
+  .scene-stats {
+    position: absolute; left: 16px; bottom: 13px; display: flex; gap: 8px; pointer-events: none;
+  }
+  .scene-stat { padding: 7px 10px; border-radius: 9px; background: rgba(8,12,24,.48); border: 1px solid rgba(185,198,255,.1); color: #9eabc9; font-size: 10px; backdrop-filter: blur(8px); }
+  .scene-stat strong { color: #edf2ff; font-size: 12px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .toast {
+    position: absolute; left: 50%; top: 54px; transform: translate(-50%, -8px);
+    padding: 9px 14px; border: 1px solid rgba(158,180,255,.2); border-radius: 99px;
+    color: #f4f6ff; background: rgba(16,22,42,.84); box-shadow: 0 8px 30px rgba(0,0,0,.2);
+    font-size: 11px; opacity: 0; pointer-events: none; transition: .22s ease; white-space: nowrap; backdrop-filter: blur(12px);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .control-panel {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: minmax(180px, 1.05fr) minmax(180px, 1.05fr) minmax(210px, 1.25fr) minmax(205px, 1.1fr);
+    gap: 10px;
+  }
+  .control-card {
+    min-width: 0;
+    padding: 13px 14px 12px;
+    border: 1px solid var(--line);
+    border-radius: 17px;
+    background: linear-gradient(145deg, rgba(28,34,58,.92), rgba(17,22,40,.92));
+    box-shadow: 0 10px 28px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.025);
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .eyebrow { color: #8290b4; font-size: 9px; letter-spacing: .16em; font-weight: 800; text-transform: uppercase; }
+  .value { color: #e6ecff; font-size: 11px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .range-wrap { display: flex; align-items: center; gap: 9px; }
+  .range-icon { width: 16px; flex: 0 0 16px; color: #7282aa; text-align: center; font-size: 13px; }
+  input[type="range"] {
+    width: 100%; min-width: 0; height: 5px; margin: 9px 0 8px; appearance: none; -webkit-appearance: none;
+    border-radius: 99px; outline: none; cursor: pointer;
+    background: linear-gradient(90deg, #66dce8 0%, #8f91f8 100%);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #f4fbff; border: 3px solid #7bcde7; box-shadow: 0 0 0 4px rgba(111,206,231,.12), 0 2px 8px rgba(0,0,0,.35);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 11px; height: 11px; border-radius: 50%; background: #f4fbff; border: 3px solid #7bcde7;
+    box-shadow: 0 0 0 4px rgba(111,206,231,.12), 0 2px 8px rgba(0,0,0,.35);
+  }
+  .range-ends { display: flex; justify-content: space-between; color: #697697; font-size: 9px; }
+  .building-select {
+    width: 100%; height: 39px; padding: 0 12px; border: 1px solid rgba(151,170,255,.16); border-radius: 11px;
+    background: rgba(9,14,28,.56); color: #edf1ff; outline: none; cursor: pointer; font-size: 12px; font-weight: 650;
+  }
+  .building-select:focus { border-color: rgba(105,226,238,.65); }
+  .explosions { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 5px; }
+  .explosion-btn {
+    min-width: 0; min-height: 38px; padding: 5px 2px; border: 1px solid rgba(151,170,255,.13); border-radius: 9px;
+    background: rgba(9,14,28,.4); color: #8f9bb9; font-size: 9px; font-weight: 750; cursor: pointer; transition: .18s ease;
+  }
+  .explosion-btn:hover { color: #edf5ff; border-color: rgba(151,170,255,.35); }
+  .explosion-btn[aria-pressed="true"] { color: #10172a; background: linear-gradient(135deg,#7ee5e7,#a9a0ff); border-color: transparent; box-shadow: 0 4px 15px rgba(104,206,228,.16); }
+  .explosion-note { color: #7784a5; font-size: 9px; margin-top: 8px; min-height: 12px; }
+  .actions { display: flex; gap: 7px; }
+  .fire-btn {
+    flex: 1; min-width: 0; height: 42px; display: flex; justify-content: center; align-items: center; gap: 9px;
+    border: 0; border-radius: 12px; color: #101626; font-weight: 900; font-size: 12px; letter-spacing: .08em;
+    background: linear-gradient(110deg,#73e3e5,#a7a0ff); box-shadow: 0 7px 22px rgba(95,203,227,.18); cursor: pointer; transition: transform .15s ease, filter .15s ease;
+  }
+  .fire-btn:hover { transform: translateY(-2px); filter: brightness(1.06); }
+  .fire-btn:active { transform: translateY(1px) scale(.99); }
+  .fire-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+  .fire-btn svg { width: 16px; height: 16px; }
+  .reset-btn {
+    flex: 0 0 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(151,170,255,.17);
+    border-radius: 12px; color: #b5c0df; background: rgba(9,14,28,.48); cursor: pointer; transition: .18s ease;
+  }
+  .reset-btn:hover { color: #fff; background: rgba(70,80,122,.45); }
+  .reset-btn svg { width: 17px; height: 17px; }
+  .action-foot { color: #7784a5; font-size: 9px; text-align: center; margin-top: 8px; }
+  .footer-note { flex: 0 0 auto; display:flex; justify-content:space-between; gap:10px; padding: 0 4px; color: #65718f; font-size: 9px; letter-spacing: .03em; }
+
+  @media (max-width: 900px) {
+    #app { gap: 9px; padding: max(9px, env(safe-area-inset-top)) max(9px, env(safe-area-inset-right)) max(9px, env(safe-area-inset-bottom)) max(9px, env(safe-area-inset-left)); }
+    #scene-wrap { border-radius: 17px; }
+    .control-panel { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .control-card { padding: 11px 12px; border-radius: 14px; }
+    .footer-note { display: none; }
+  }
+  @media (max-width: 520px) {
+    html, body { overflow: auto; }
+    #app { height: auto; min-height: 100dvh; overflow: visible; }
+    #scene-wrap { flex: 0 0 auto; height: 49dvh; min-height: 255px; max-height: 430px; }
+    .brand-name { font-size: 11px; }
+    .brand-sub { font-size: 8px; }
+    .top-status { font-size: 9px; padding: 7px 9px; }
+    .back { min-height: 37px; padding: 0 11px; font-size: 11px; }
+    .scene-label { top: 12px; left: 12px; font-size: 8px; }
+    .scene-hint { top: 11px; right: 11px; font-size: 8px; }
+    .scene-stats { left: 9px; bottom: 8px; gap: 5px; }
+    .scene-stat { padding: 6px 7px; font-size: 8px; }
+    .scene-stat strong { font-size: 10px; }
+    .toast { top: 40px; font-size: 9px; }
+    .control-panel { grid-template-columns: 1fr 1fr; }
+    .control-card { padding: 10px; }
+    .eyebrow { font-size: 8px; }
+    .explosion-btn { font-size: 8px; min-height: 35px; }
+    .explosion-note { font-size: 8px; }
+    .fire-btn { height: 39px; font-size: 11px; }
+    .reset-btn { height: 39px; flex-basis: 39px; }
+  }
+  @media (max-width: 360px) {
+    .top-status { display: none; }
+    .control-panel { grid-template-columns: 1fr; }
+    #scene-wrap { height: 44dvh; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <a class="back" href="../../index.html" aria-label="Вернуться на главную страницу">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/><path d="M9 12h12"/></svg>
+      Назад
+    </a>
+    <div class="brand" aria-label="Blockfall">
+      <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5v10l-9 5-9-5V7Z"/><path d="M12 12v10"/></svg></div>
+      <div><div class="brand-name">BLOCKFALL</div><div class="brand-sub">PHYSICS PLAYGROUND</div></div>
+    </div>
+    <div class="top-status"><span class="status-dot"></span> ПОЛИГОН АКТИВЕН</div>
+  </header>
+
+  <main id="scene-wrap" aria-label="Игровое поле">
+    <canvas id="game" aria-label="Потяни в левой части поля, чтобы изменить угол пушки"></canvas>
+    <div class="scene-label">01 / ЗОНА ИСПЫТАНИЙ</div>
+    <div class="scene-hint">ПЕРЕТАЩИ ПОЛЕ РЯДОМ С ПУШКОЙ — ПРИЦЕЛЬСЯ</div>
+    <div class="scene-stats">
+      <div class="scene-stat">ВЫСТРЕЛЫ <strong id="shots">0</strong></div>
+      <div class="scene-stat">РАЗРУШЕНО <strong id="destroyed">0</strong></div>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <section class="control-panel" aria-label="Настройки выстрела">
+    <div class="control-card">
+      <div class="card-head"><span class="eyebrow">Угол пушки</span><span class="value" id="angle-value">38°</span></div>
+      <div class="range-wrap"><span class="range-icon">↙</span><input id="angle" type="range" min="8" max="78" value="38" aria-label="Угол наклона пушки"><span class="range-icon">↗</span></div>
+      <div class="range-ends"><span>Пологий</span><span>Высокий</span></div>
+    </div>
+    <div class="control-card">
+      <div class="card-head"><span class="eyebrow">Дальность полёта</span><span class="value" id="power-value">64%</span></div>
+      <div class="range-wrap"><span class="range-icon">◂</span><input id="power" type="range" min="5" max="100" value="64" aria-label="Дальность полёта снаряда"><span class="range-icon">▸</span></div>
+      <div class="range-ends"><span>Ближе</span><span>Дальше</span></div>
+    </div>
+    <div class="control-card">
+      <div class="card-head"><span class="eyebrow">Тип постройки</span><span class="value">5 ВАРИАНТОВ</span></div>
+      <select class="building-select" id="building" aria-label="Выбрать постройку">
+        <option value="castle">🏰 Замок</option>
+        <option value="tower">▥ Высокая башня</option>
+        <option value="pyramid">▲ Пирамида</option>
+        <option value="wall">▤ Крепкая стена</option>
+        <option value="bridge">⌁ Мост</option>
+      </select>
+      <div class="explosion-note" id="building-note">Сложная конструкция с башнями и зубцами</div>
+    </div>
+    <div class="control-card">
+      <div class="card-head"><span class="eyebrow">Уровень взрыва</span><span class="value" id="explosion-value">СРЕДНЕ</span></div>
+      <div class="explosions" role="group" aria-label="Уровень взрыва">
+        <button class="explosion-btn" data-explosion="off" aria-pressed="false">Откл.</button>
+        <button class="explosion-btn" data-explosion="weak" aria-pressed="false">Слабо</button>
+        <button class="explosion-btn" data-explosion="medium" aria-pressed="true">Средне</button>
+        <button class="explosion-btn" data-explosion="strong" aria-pressed="false">Сильно</button>
+        <button class="explosion-btn" data-explosion="special" aria-pressed="false">Особенный</button>
+      </div>
+      <div class="explosion-note" id="explosion-note">Сбалансированная ударная волна</div>
+    </div>
+    <div class="control-card">
+      <div class="card-head"><span class="eyebrow">Запуск</span><span class="value">SPACE ↵</span></div>
+      <div class="actions">
+        <button class="fire-btn" id="fire"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 3.8c0-.8.9-1.3 1.6-.9l13 7.2a1.1 1.1 0 0 1 0 1.9l-13 7.2c-.7.4-1.6-.1-1.6-.9V3.8Z"/></svg> ВЫСТРЕЛИТЬ</button>
+        <button class="reset-btn" id="reset" title="Восстановить постройку" aria-label="Восстановить постройку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/></svg></button>
+      </div>
+      <div class="action-foot">Сбросить постройку · R</div>
+    </div>
+  </section>
+  <div class="footer-note"><span>АРКАДНАЯ ФИЗИЧЕСКАЯ СИМУЛЯЦИЯ · КУБИКИ РЕАГИРУЮТ НА ИМПУЛЬС И ГРАВИТАЦИЮ</span><span>BLOCKFALL / BUILD. AIM. DESTROY.</span></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scene = document.getElementById('scene-wrap');
+  const angleInput = document.getElementById('angle');
+  const powerInput = document.getElementById('power');
+  const buildingInput = document.getElementById('building');
+  const angleValue = document.getElementById('angle-value');
+  const powerValue = document.getElementById('power-value');
+  const explosionValue = document.getElementById('explosion-value');
+  const explosionNote = document.getElementById('explosion-note');
+  const buildingNote = document.getElementById('building-note');
+  const fireButton = document.getElementById('fire');
+  const toastEl = document.getElementById('toast');
+  const shotsEl = document.getElementById('shots');
+  const destroyedEl = document.getElementById('destroyed');
+
+  const palette = ['#7f8ee6', '#8b83db', '#70a9d9', '#7799c9', '#8b9bd0', '#6b8fc0'];
+  const explosionInfo = {
+    off:     { label: 'ОТКЛ.', note: 'Только сила прямого столкновения', radius: .17, force: .42, color: '#c4d4ff' },
+    weak:    { label: 'СЛАБО', note: 'Небольшая волна вокруг попадания', radius: .27, force: .85, color: '#ffcf83' },
+    medium:  { label: 'СРЕДНЕ', note: 'Сбалансированная ударная волна', radius: .39, force: 1.2, color: '#ff9b71' },
+    strong:  { label: 'СИЛЬНО', note: 'Мощная волна разбрасывает больше блоков', radius: .52, force: 1.72, color: '#ff6c85' },
+    special: { label: 'ХРОНОРАЗЛОМ', note: 'Вихрь замедляет время и закручивает обломки', radius: .68, force: 2.12, color: '#87f3ed' }
+  };
+  const buildingInfo = {
+    castle: 'Сложная конструкция с башнями и зубцами',
+    tower: 'Узкая высокая башня из нескольких ярусов',
+    pyramid: 'Ступенчатая конструкция с широкой основой',
+    wall: 'Широкая стена из плотно уложенных блоков',
+    bridge: 'Пролёт с двумя опорами и верхним настилом'
+  };
+
+  let W = 0, H = 0, dpr = 1, groundY = 0, unit = 20;
+  let blocks = [], particles = [], rings = [], projectile = null;
+  let explosionMode = 'medium';
+  let shots = 0, destroyed = 0, lastTime = 0;
+  let toastTimer = 0, recoil = 0, screenShake = 0;
+  let specialTimer = 0, specialCenter = null, hitPulse = 0;
+  let aimingPointer = null;
+  let frame = 0;
+
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const angleRad = () => Number(angleInput.value) * Math.PI / 180;
+  const power = () => Number(powerInput.value);
+
+  function showToast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  function resize() {
+    const rect = scene.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const oldW = W;
+    W = rect.width;
+    H = rect.height;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    groundY = H - Math.max(23, H * .055);
+    unit = Math.max(13, Math.min(28, W * .032, H * .075));
+    // Rebuild on viewport changes so the structure stays correctly proportioned.
+    buildStructure(buildingInput.value);
+    if (oldW && projectile) projectile = null;
+  }
+
+  function structureCells(type) {
+    const cells = [];
+    const add = (c, r, tint = 0) => cells.push({ c, r, tint });
+    if (type === 'wall') {
+      for (let r = 0; r < 5; r++) for (let c = 0; c < 10; c++) add(c, r);
+      for (let c = 0; c < 10; c += 2) add(c, 5, 1);
+    } else if (type === 'tower') {
+      for (let r = 0; r < 10; r++) for (let c = 0; c < 4; c++) add(c, r);
+      for (let c = -1; c <= 4; c += 5) add(c, 10, 1);
+      for (let c = 0; c < 4; c++) add(c, 10, 1);
+    } else if (type === 'pyramid') {
+      const widths = [9, 7, 5, 3, 1];
+      widths.forEach((count, r) => {
+        const start = (9 - count) / 2;
+        for (let c = 0; c < count; c++) add(start + c, r);
+      });
+    } else if (type === 'bridge') {
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 2; c++) add(c, r);
+        for (let c = 10; c < 12; c++) add(c, r);
+      }
+      for (let c = 0; c < 12; c++) add(c, 6, 1);
+      for (let c = 2; c < 10; c++) add(c, 7, 1);
+    } else { // castle
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 9; c++) add(c, r);
+      for (let r = 4; r < 8; r++) {
+        for (let c = 0; c < 2; c++) add(c, r, 1);
+        for (let c = 7; c < 9; c++) add(c, r, 1);
+      }
+      for (let c = 0; c < 9; c += 2) add(c, 4, 1);
+    }
+    return cells;
+  }
+
+  function buildStructure(type) {
+    const cells = structureCells(type);
+    const minC = Math.min(...cells.map(v => v.c));
+    const maxC = Math.max(...cells.map(v => v.c));
+    const width = (maxC - minC + 1) * unit;
+    const center = W * .765;
+    const left = clamp(center - width / 2, W * .48, W - width - 10);
+    blocks = cells.map((cell, i) => ({
+      x: left + (cell.c - minC) * unit,
+      y: groundY - (cell.r + 1) * unit,
+      w: unit - 1.1, h: unit - 1.1,
+      vx: 0, vy: 0, rot: 0, vr: 0,
+      color: palette[(i + cell.tint * 2) % palette.length],
+      awake: false, alpha: 1, id: i
+    }));
+    projectile = null;
+    particles = [];
+    rings = [];
+    specialTimer = 0;
+    specialCenter = null;
+    fireButton.disabled = false;
+    buildingNote.textContent = buildingInfo[type];
+  }
+
+  function cannonGeometry() {
+    const x = W * .115;
+    const y = groundY - Math.max(29, unit * 1.55);
+    const a = angleRad();
+    const length = Math.max(42, Math.min(68, W * .058));
+    const tip = { x: x + Math.cos(a) * length, y: y - Math.sin(a) * length };
+    return { x, y, a, length, tip };
+  }
+
+  function launchParameters() {
+    const g = W * 1.45;
+    const v = W * (.58 + power() / 100 * .68);
+    const geom = cannonGeometry();
+    return { x: geom.tip.x + Math.cos(geom.a) * 7, y: geom.tip.y - Math.sin(geom.a) * 7, vx: Math.cos(geom.a) * v, vy: -Math.sin(geom.a) * v, g };
+  }
+
+  function setExplosion(mode) {
+    explosionMode = mode;
+    const info = explosionInfo[mode];
+    explosionValue.textContent = info.label;
+    explosionNote.textContent = info.note;
+    document.querySelectorAll('.explosion-btn').forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.explosion === mode)));
+  }
+
+  function updateReadouts() {
+    angleValue.textContent = `${angleInput.value}°`;
+    powerValue.textContent = `${powerInput.value}%`;
+  }
+
+  function spawnParticles(x, y, count, color, speed = 220, life = 1) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, Math.PI * 2), v = rand(speed * .22, speed);
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, size: rand(1.3, 3.8), life: rand(life * .45, life), maxLife: life, color, drag: rand(.965, .99), glow: rand(3, 12) });
+    }
+  }
+
+  function fire() {
+    if (projectile) { showToast('Снаряд уже в полёте'); return; }
+    const p = launchParameters();
+    projectile = { ...p, startX: p.x, startY: p.y, r: Math.max(5, unit * .22), t: 0, trail: [] };
+    shots++;
+    shotsEl.textContent = shots;
+    recoil = .18;
+    const g = cannonGeometry();
+    spawnParticles(g.tip.x, g.tip.y, 9, '#b9eaff', 95, .32);
+    fireButton.disabled = true;
+  }
+
+  // Returns the first point where a moving circle crosses a block's expanded AABB.
+  // Swept collision avoids fast projectiles skipping thin blocks between animation frames.
+  function segmentRectEntry(x0, y0, x1, y1, rect, padding = 0) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const minX = rect.x - padding, maxX = rect.x + rect.w + padding;
+    const minY = rect.y - padding, maxY = rect.y + rect.h + padding;
+    let enter = 0, exit = 1;
+    const axes = [
+      [x0, dx, minX, maxX],
+      [y0, dy, minY, maxY]
+    ];
+    for (const [origin, delta, min, max] of axes) {
+      if (Math.abs(delta) < 1e-8) {
+        if (origin < min || origin > max) return null;
+        continue;
+      }
+      let t1 = (min - origin) / delta;
+      let t2 = (max - origin) / delta;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      enter = Math.max(enter, t1);
+      exit = Math.min(exit, t2);
+      if (enter > exit) return null;
+    }
+    return enter >= 0 && enter <= 1 ? enter : null;
+  }
+
+  function impact(x, y, directBlock = null) {
+    if (!projectile) return;
+    projectile = null;
+    const info = explosionInfo[explosionMode];
+    const special = explosionMode === 'special';
+    const noBlast = explosionMode === 'off';
+    const radius = noBlast ? 0 : H * info.radius;
+    const force = noBlast ? 0 : H * info.force;
+    let newlyMoved = 0;
+
+    for (const b of blocks) {
+      const directHit = b === directBlock;
+      // "Off" really means off: only the block physically struck by the ball moves.
+      if (noBlast && !directHit) continue;
+
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      let dx = cx - x, dy = cy - y;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      if (dist < 1.01) { dx = 1; dy = -.25; }
+      const nx = dx / dist, ny = dy / dist;
+      const influence = noBlast ? 0 : clamp(1 - dist / radius, 0, 1);
+      const impulse = (force * influence) + (directHit ? H * (noBlast ? .46 : .34) : 0);
+
+      if (impulse > 1) {
+        b.awake = true;
+        b.vx += nx * impulse + rand(-18, 18);
+        b.vy += ny * impulse - (special ? impulse * .06 : impulse * .10);
+        if (special && influence > 0) {
+          // A tangential impulse gives the special blast a genuine rotational kick.
+          const swirl = force * influence * .62;
+          b.vx += -ny * swirl;
+          b.vy += nx * swirl;
+        }
+        b.vr += clamp((dx - dy + rand(-18, 18)) / Math.max(20, H), -1.5, 1.5) * rand(2.5, 5.5);
+        newlyMoved++;
+      }
+    }
+
+    if (special) {
+      specialTimer = 2.05;
+      specialCenter = { x, y, t: 0, radius: radius * 1.12 };
+      spawnParticles(x, y, 150, '#8af6ef', H * 1.55, 1.9);
+      spawnParticles(x, y, 100, '#b69bff', H * 1.3, 1.7);
+      rings.push({ x, y, radius: 8, max: radius * 1.18, life: 1.35, color: '#85f4ed', width: 4 });
+      rings.push({ x, y, radius: 4, max: radius * .88, life: 1.15, color: '#bc8cff', width: 2 });
+      rings.push({ x, y, radius: 3, max: radius * .58, life: .9, color: '#f3a7ff', width: 2 });
+      screenShake = 10;
+    } else if (!noBlast) {
+      spawnParticles(x, y, Math.round(26 + info.force * 26), info.color, H * (1.1 + info.force * .34), .85 + info.force * .12);
+      rings.push({ x, y, radius: 5, max: radius, life: .55 + info.force * .15, color: info.color, width: 3 });
+      screenShake = 2 + info.force * 3;
+    } else {
+      spawnParticles(x, y, 16, '#c2d8f7', H * .65, .48);
+      rings.push({ x, y, radius: 3, max: H * .09, life: .28, color: '#b8d8ff', width: 2 });
+      screenShake = 1.2;
+    }
+
+    hitPulse = .28;
+    if (newlyMoved > 0) destroyed += Math.max(1, Math.round(newlyMoved * .18));
+    destroyedEl.textContent = destroyed;
+    fireButton.disabled = false;
+    showToast(special ? 'Хроноразлом: обломки захвачены вихрем' : (noBlast ? 'Прямое попадание' : 'Попадание! Постройка рушится'));
+  }
+
+  function updateProjectile(dt) {
+    if (!projectile) return;
+    const p = projectile;
+    const x0 = p.x, y0 = p.y;
+    p.t += dt;
+    const nextX = p.startX + p.vx * p.t;
+    const nextY = p.startY + p.vy * p.t + .5 * p.g * p.t * p.t;
+    let firstHit = 1.000001;
+    let hitBlock = null;
+
+    for (const b of blocks) {
+      const hitT = segmentRectEntry(x0, y0, nextX, nextY, b, p.r);
+      if (hitT !== null && hitT < firstHit) {
+        firstHit = hitT;
+        hitBlock = b;
+      }
+    }
+
+    // Ground and screen-edge crossings are checked on the same swept segment.
+    const groundLine = groundY - p.r;
+    if (y0 < groundLine && nextY >= groundLine) {
+      const tGround = (groundLine - y0) / Math.max(1e-8, nextY - y0);
+      if (tGround < firstHit) { firstHit = tGround; hitBlock = null; }
+    }
+    const rightEdge = W + 60;
+    if (x0 <= rightEdge && nextX > rightEdge) {
+      const tEdge = (rightEdge - x0) / Math.max(1e-8, nextX - x0);
+      if (tEdge < firstHit) { firstHit = tEdge; hitBlock = null; }
+    }
+
+    if (firstHit <= 1) {
+      p.x = x0 + (nextX - x0) * firstHit;
+      p.y = y0 + (nextY - y0) * firstHit;
+      const ix = clamp(p.x, 10, W - 10);
+      impact(ix, Math.min(p.y, groundLine), hitBlock);
+      return;
+    }
+
+    p.x = nextX;
+    p.y = nextY;
+    p.trail.push({ x: p.x, y: p.y });
+    if (p.trail.length > 9) p.trail.shift();
+    if (p.t > 5) impact(clamp(p.x, 10, W - 10), clamp(p.y, 8, groundLine), null);
+  }
+
+  function updateBlocks(dt) {
+    const g = W * 1.45;
+    const inChrono = specialTimer > 0 && specialCenter;
+    const timeScale = inChrono ? .56 : 1;
+    const gravity = inChrono ? g * .22 : g;
+    for (const b of blocks) {
+      if (!b.awake) continue;
+
+      if (inChrono) {
+        // The special field adds a continuous tangential acceleration, not just a visual spin.
+        const dx = b.x + b.w / 2 - specialCenter.x;
+        const dy = b.y + b.h / 2 - specialCenter.y;
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const falloff = clamp(1 - dist / specialCenter.radius, 0, 1);
+        const swirlAcceleration = H * 1.65 * falloff;
+        b.vx += (-dy / dist) * swirlAcceleration * dt;
+        b.vy += ( dx / dist) * swirlAcceleration * dt;
+      }
+
+      const step = dt * timeScale;
+      b.vy += gravity * step;
+      b.x += b.vx * step;
+      b.y += b.vy * step;
+      b.rot += b.vr * step;
+      b.vx *= Math.pow(.992, step * 60);
+      b.vr *= Math.pow(.988, step * 60);
+      if (b.y + b.h > groundY) {
+        b.y = groundY - b.h;
+        if (Math.abs(b.vy) > 28) b.vy *= -.27;
+        else b.vy = 0;
+        b.vx *= .78;
+        b.vr *= .75;
+      }
+      if (b.x < -W * .4 || b.x > W * 1.4 || b.y > H + 180) b.alpha = Math.max(0, b.alpha - dt * .7);
+    }
+    // Lightweight block-to-block contacts. This is intentionally arcade-like,
+    // but preserves momentum and prevents most pieces from simply passing through.
+    for (let i = 0; i < blocks.length; i++) {
+      const a = blocks[i];
+      if (!a.awake || a.alpha <= 0) continue;
+      for (let j = i + 1; j < blocks.length; j++) {
+        const b = blocks[j];
+        if (!b.awake || b.alpha <= 0) continue;
+        const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+        const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        if (ox <= 0 || oy <= 0) continue;
+        if (ox < oy) {
+          const sign = (a.x + a.w / 2) < (b.x + b.w / 2) ? -1 : 1;
+          a.x += sign * ox * .5; b.x -= sign * ox * .5;
+          const av = a.vx; a.vx = b.vx * .55; b.vx = av * .55;
+        } else {
+          const sign = (a.y + a.h / 2) < (b.y + b.h / 2) ? -1 : 1;
+          a.y += sign * oy * .5; b.y -= sign * oy * .5;
+          if (sign < 0) { a.vy = Math.min(a.vy, b.vy * .15); b.vy = Math.max(0, b.vy) * .72; }
+          else { b.vy = Math.min(b.vy, a.vy * .15); a.vy = Math.max(0, a.vy) * .72; }
+          a.vx *= .94; b.vx *= .94;
+        }
+      }
+    }
+    blocks = blocks.filter(b => b.alpha > .02);
+  }
+
+  function updateEffects(dt) {
+    if (specialTimer > 0) {
+      specialTimer = Math.max(0, specialTimer - dt);
+      if (specialCenter) specialCenter.t += dt;
+    }
+    if (hitPulse > 0) hitPulse = Math.max(0, hitPulse - dt);
+    if (recoil > 0) recoil = Math.max(0, recoil - dt);
+    if (screenShake > 0) screenShake = Math.max(0, screenShake - dt * 26);
+    particles = particles.filter(p => p.life > 0);
+    for (const p of particles) {
+      p.life -= dt;
+      const drag = Math.pow(p.drag, dt * 60);
+      p.vx *= drag;
+      p.vy = p.vy * drag + H * .52 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    rings = rings.filter(r => r.life > 0);
+    for (const r of rings) {
+      r.life -= dt;
+      const progress = 1 - Math.max(0, r.life) / (r.maxLife || (r.maxLife = r.life + dt));
+      r.radius += (r.max - r.radius) * Math.min(1, dt * 4.8);
+    }
+  }
+
+  function drawBackground() {
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#171d37'); bg.addColorStop(.58, '#1b2541'); bg.addColorStop(1, '#111a2b');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // Soft ambient glows.
+    let glow = ctx.createRadialGradient(W * .2, H * .25, 5, W * .2, H * .25, W * .58);
+    glow.addColorStop(0, 'rgba(94,128,205,.15)'); glow.addColorStop(1, 'rgba(94,128,205,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+    glow = ctx.createRadialGradient(W * .82, H * .35, 2, W * .82, H * .35, W * .36);
+    glow.addColorStop(0, 'rgba(124,112,210,.13)'); glow.addColorStop(1, 'rgba(124,112,210,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+    // Distant stars and little floating motes.
+    for (let i = 0; i < 34; i++) {
+      const x = (i * 137.7 % W), y = (i * 61.3 % Math.max(30, H * .72));
+      ctx.globalAlpha = .18 + .18 * Math.sin(frame * .018 + i);
+      ctx.fillStyle = i % 3 ? '#b8c9ff' : '#7be7e8';
+      ctx.beginPath(); ctx.arc(x, y, i % 7 === 0 ? 1.6 : .8, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Distant angular skyline / hills.
+    ctx.fillStyle = 'rgba(12,19,36,.34)';
+    ctx.beginPath(); ctx.moveTo(0, groundY);
+    for (let x = 0; x <= W + 80; x += 80) ctx.lineTo(x, groundY - 20 - Math.sin(x * .012) * 13 - (x % 240 === 0 ? 24 : 0));
+    ctx.lineTo(W, groundY); ctx.closePath(); ctx.fill();
+    // Ground plane.
+    const floor = ctx.createLinearGradient(0, groundY - 12, 0, H);
+    floor.addColorStop(0, '#26334f'); floor.addColorStop(1, '#11192b');
+    ctx.fillStyle = floor; ctx.fillRect(0, groundY, W, H - groundY);
+    ctx.strokeStyle = 'rgba(133,169,211,.14)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, groundY + .5); ctx.lineTo(W, groundY + .5); ctx.stroke();
+    ctx.strokeStyle = 'rgba(122,154,205,.065)';
+    for (let x = 0; x < W; x += unit * 2) { ctx.beginPath(); ctx.moveTo(x, groundY); ctx.lineTo(x - unit * 1.3, H); ctx.stroke(); }
+    for (let y = groundY + 16; y < H; y += 16) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  }
+
+  function drawTrajectory() {
+    if (projectile) return;
+    const p = launchParameters();
+    const step = 1 / 120;
+    let x0 = p.x, y0 = p.y;
+    let endX = x0, endY = y0;
+    ctx.save();
+    ctx.setLineDash([3, 7]);
+    ctx.lineWidth = 2;
+    const grad = ctx.createLinearGradient(p.x, p.y, W * .82, groundY - H * .2);
+    grad.addColorStop(0, 'rgba(112,231,236,.94)');
+    grad.addColorStop(1, 'rgba(175,157,255,.18)');
+    ctx.strokeStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+
+    // Trace the exact same analytic parabola and collision boundaries as the live shot.
+    for (let t = step; t <= 5; t += step) {
+      const x1 = p.x + p.vx * t;
+      const y1 = p.y + p.vy * t + .5 * p.g * t * t;
+      let firstHit = 1.000001;
+      for (const b of blocks) {
+        const hitT = segmentRectEntry(x0, y0, x1, y1, b, p.r);
+        if (hitT !== null && hitT < firstHit) firstHit = hitT;
+      }
+      const groundLine = groundY - p.r;
+      if (y0 < groundLine && y1 >= groundLine) {
+        firstHit = Math.min(firstHit, (groundLine - y0) / Math.max(1e-8, y1 - y0));
+      }
+      if (x0 <= W + 60 && x1 > W + 60) {
+        firstHit = Math.min(firstHit, (W + 60 - x0) / Math.max(1e-8, x1 - x0));
+      }
+
+      if (firstHit <= 1) {
+        endX = x0 + (x1 - x0) * firstHit;
+        endY = y0 + (y1 - y0) * firstHit;
+        ctx.lineTo(endX, endY);
+        break;
+      }
+
+      endX = x1; endY = y1;
+      ctx.lineTo(x1, y1);
+      x0 = x1; y0 = y1;
+      if (t + step > 5) break;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(148,244,244,.95)';
+    ctx.shadowColor = '#75e8ec'; ctx.shadowBlur = 9;
+    ctx.beginPath(); ctx.arc(endX, endY, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCannon() {
+    const g = cannonGeometry();
+    const { x, y, a, length, tip } = g;
+    ctx.save();
+    // Ground shadow.
+    ctx.fillStyle = 'rgba(0,0,0,.27)';
+    ctx.beginPath(); ctx.ellipse(x + 4, groundY - 3, unit * 1.6, unit * .34, 0, 0, Math.PI * 2); ctx.fill();
+    // Carriage.
+    ctx.fillStyle = '#394867'; ctx.strokeStyle = '#7188b3'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x - unit * .95, groundY - unit * 1.2, unit * 1.9, unit * .55, 5); ctx.fill(); ctx.stroke();
+    // Wheel.
+    ctx.fillStyle = '#202b43'; ctx.strokeStyle = '#92a5ca'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, groundY - unit * .35, unit * .48, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(148,169,205,.65)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x - unit * .3, groundY - unit * .35); ctx.lineTo(x + unit * .3, groundY - unit * .35); ctx.moveTo(x, groundY - unit * .65); ctx.lineTo(x, groundY - unit * .05); ctx.stroke();
+    // Barrel, with slight recoil.
+    const kick = recoil > 0 ? recoil * 14 : 0;
+    ctx.translate(x - Math.cos(a) * kick, y + Math.sin(a) * kick);
+    ctx.rotate(-a);
+    const barrelGrad = ctx.createLinearGradient(0, -unit * .34, 0, unit * .34);
+    barrelGrad.addColorStop(0, '#b2c4e8'); barrelGrad.addColorStop(.25, '#60779f'); barrelGrad.addColorStop(.72, '#344765'); barrelGrad.addColorStop(1, '#1f2a43');
+    ctx.fillStyle = barrelGrad; ctx.strokeStyle = '#a8bbdf'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.roundRect(0, -unit * .32, length, unit * .64, [4, 7, 7, 4]); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#17243c'; ctx.fillRect(length - 8, -unit * .39, 8, unit * .78);
+    ctx.strokeStyle = '#a8d9e7'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(8, -unit * .2); ctx.lineTo(length - 12, -unit * .2); ctx.stroke();
+    ctx.restore();
+    // Pivot glow.
+    const halo = ctx.createRadialGradient(x, y, 1, x, y, unit * 1.1);
+    halo.addColorStop(0, 'rgba(112,228,237,.19)'); halo.addColorStop(1, 'rgba(112,228,237,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(x, y, unit * 1.1, 0, Math.PI * 2); ctx.fill();
+    // Muzzle flash while launching.
+    if (recoil > .09) {
+      ctx.fillStyle = `rgba(140,232,255,${recoil * 2})`;
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, 4 + recoil * 16, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawBlock(b) {
+    if (b.alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = b.alpha;
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    ctx.translate(cx, cy); ctx.rotate(b.rot);
+    const w = b.w, h = b.h;
+    const grad = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+    grad.addColorStop(0, '#b4c5ed'); grad.addColorStop(.16, b.color); grad.addColorStop(1, '#354d78');
+    ctx.shadowColor = 'rgba(5,10,25,.22)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = grad; ctx.strokeStyle = 'rgba(206,222,255,.42)'; ctx.lineWidth = .8;
+    ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, 2.5); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.fillStyle = 'rgba(236,244,255,.2)';
+    ctx.beginPath(); ctx.moveTo(-w / 2 + 3, -h / 2 + 2); ctx.lineTo(w / 2 - 3, -h / 2 + 2); ctx.lineTo(w / 2 - 5, -h / 2 + 4); ctx.lineTo(-w / 2 + 3, -h / 2 + 4); ctx.fill();
+    ctx.strokeStyle = 'rgba(15,28,54,.22)'; ctx.beginPath(); ctx.moveTo(-w / 2 + 3, h / 2 - 3); ctx.lineTo(w / 2 - 3, h / 2 - 3); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawProjectile() {
+    if (!projectile) return;
+    const p = projectile;
+    for (let i = 0; i < p.trail.length; i++) {
+      const t = p.trail[i], alpha = (i + 1) / p.trail.length * .34;
+      ctx.fillStyle = `rgba(148,231,255,${alpha})`;
+      ctx.beginPath(); ctx.arc(t.x, t.y, 2 + i * .25, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.save();
+    ctx.shadowColor = '#8cecff'; ctx.shadowBlur = 18;
+    const grad = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, p.r * 2.4);
+    grad.addColorStop(0, '#ffffff'); grad.addColorStop(.35, '#a5f3ff'); grad.addColorStop(1, '#62b9e8');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawEffects() {
+    for (const r of rings) {
+      const alpha = clamp(r.life / 1.2, 0, 1);
+      ctx.save(); ctx.globalAlpha = alpha;
+      ctx.strokeStyle = r.color; ctx.lineWidth = r.width * (.45 + alpha * .55);
+      ctx.shadowColor = r.color; ctx.shadowBlur = 15;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    for (const p of particles) {
+      ctx.save(); ctx.globalAlpha = clamp(p.life / p.maxLife, 0, 1);
+      ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = p.glow;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (.55 + .45 * p.life / p.maxLife), 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (specialTimer > 0 && specialCenter) {
+      const c = specialCenter;
+      const pulse = .5 + .5 * Math.sin(c.t * 12);
+      ctx.save();
+      const halo = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, H * .72);
+      halo.addColorStop(0, 'rgba(125,246,231,.22)');
+      halo.addColorStop(.34, 'rgba(139,126,255,.12)');
+      halo.addColorStop(.72, 'rgba(222,119,255,.045)');
+      halo.addColorStop(1, 'rgba(100,119,255,0)');
+      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(c.x, c.y, H * .72, 0, Math.PI * 2); ctx.fill();
+      ctx.translate(c.x, c.y);
+      // Three animated spiral ribbons create a twisting space-tear instead of flat rings.
+      for (let ribbon = 0; ribbon < 4; ribbon++) {
+        const direction = ribbon % 2 ? -1 : 1;
+        ctx.strokeStyle = ['rgba(119,245,232,.9)', 'rgba(184,145,255,.86)', 'rgba(255,153,230,.72)', 'rgba(145,190,255,.72)'][ribbon];
+        ctx.lineWidth = 2.8 - ribbon * .35;
+        ctx.shadowColor = ribbon % 2 ? '#ba8cff' : '#7bf5e5';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        for (let j = 0; j <= 90; j++) {
+          const u = j / 90;
+          const a = direction * (u * Math.PI * 3.8) + c.t * (1.9 + ribbon * .22) + ribbon * Math.PI / 2;
+          const rr = H * (.055 + u * (.34 + ribbon * .018));
+          const px = Math.cos(a) * rr;
+          const py = Math.sin(a) * rr * (.72 + ribbon * .025);
+          if (j === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      ctx.rotate(c.t * 1.7);
+      for (let i = 0; i < 18; i++) {
+        const a = i * Math.PI * 2 / 18 + c.t * (i % 2 ? 1.3 : -1.6);
+        const rr = H * (.14 + .12 * ((i % 4) / 4)) * (1 + pulse * .04);
+        ctx.fillStyle = i % 2 ? '#c69dff' : '#9ffff0';
+        ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr * .6, 1.5 + (i % 3), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawAimMarker() {
+    const p = launchParameters();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(122,228,236,.26)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x - 15, p.y); ctx.lineTo(p.x - 7, p.y); ctx.moveTo(p.x + 7, p.y); ctx.lineTo(p.x + 15, p.y); ctx.stroke();
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (screenShake > .2) ctx.translate(rand(-screenShake, screenShake), rand(-screenShake, screenShake));
+    drawBackground();
+    drawTrajectory();
+    // Faint target-zone guide.
+    ctx.strokeStyle = 'rgba(129,157,225,.12)'; ctx.setLineDash([3, 8]); ctx.beginPath(); ctx.moveTo(W * .49, groundY); ctx.lineTo(W * .49, H * .35); ctx.stroke(); ctx.setLineDash([]);
+    for (const b of blocks) drawBlock(b);
+    drawCannon();
+    drawAimMarker();
+    drawProjectile();
+    drawEffects();
+    ctx.restore();
+    frame++;
+  }
+
+  function loop(now) {
+    const dt = Math.min(.034, (now - (lastTime || now)) / 1000 || .016);
+    lastTime = now;
+    updateProjectile(dt);
+    updateBlocks(dt);
+    updateEffects(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  function aimAt(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const px = clientX - rect.left, py = clientY - rect.top;
+    const g = cannonGeometry();
+    const a = Math.atan2(g.y - py, px - g.x) * 180 / Math.PI;
+    angleInput.value = String(Math.round(clamp(a, 8, 78)));
+    updateReadouts();
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x > W * .43) return;
+    aimingPointer = e.pointerId;
+    canvas.setPointerCapture(e.pointerId);
+    aimAt(e.clientX, e.clientY);
+  });
+  canvas.addEventListener('pointermove', e => { if (aimingPointer === e.pointerId) aimAt(e.clientX, e.clientY); });
+  canvas.addEventListener('pointerup', e => { if (aimingPointer === e.pointerId) aimingPointer = null; });
+  canvas.addEventListener('pointercancel', () => { aimingPointer = null; });
+
+  angleInput.addEventListener('input', updateReadouts);
+  powerInput.addEventListener('input', updateReadouts);
+  buildingInput.addEventListener('change', () => {
+    buildStructure(buildingInput.value);
+    showToast('Новая постройка готова');
+  });
+  document.querySelectorAll('.explosion-btn').forEach(btn => btn.addEventListener('click', () => setExplosion(btn.dataset.explosion)));
+  fireButton.addEventListener('click', fire);
+  document.getElementById('reset').addEventListener('click', () => {
+    buildStructure(buildingInput.value);
+    showToast('Постройка восстановлена');
+  });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space' && !['INPUT','SELECT','BUTTON'].includes(document.activeElement.tagName)) { e.preventDefault(); fire(); }
+    if (e.key.toLowerCase() === 'r' && !['INPUT','SELECT','BUTTON'].includes(document.activeElement.tagName)) {
+      buildStructure(buildingInput.value); showToast('Постройка восстановлена');
+    }
+  });
+  if ('ResizeObserver' in window) new ResizeObserver(resize).observe(scene);
+  else window.addEventListener('resize', resize);
+
+  setExplosion('medium');
+  updateReadouts();
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
