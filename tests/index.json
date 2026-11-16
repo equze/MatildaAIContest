@@ -1,7 +1,7 @@
 {
   "tests": [
     "fireball",
-    "cannonchaos",
+    "cannon_chaos",
     "cosmicascent",
     "crtsnake"
   ]
