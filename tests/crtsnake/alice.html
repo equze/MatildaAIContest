@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b160b">
+<title>ЗМЕЙКА · RETRO ARCADE</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--page);
+  color:var(--ink);
+  font-family:'Courier New',monospace;
+  font-weight:bold;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:manipulation;
+  overflow:hidden;
+}
+:root{
+  --page:#0b160b; --ink:#d8e8a0; --dim:#6a8a4a; --accent:#9bbc0f;
+  --panel:#16260f; --panel2:#1e3414; --shadow:#0a140a; --hl:#3c5a30;
+}
+#crt{position:fixed;inset:0;pointer-events:none;z-index:90;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0 2px, transparent 2px 4px);}
+#back{
+  position:fixed;top:10px;left:10px;z-index:80;
+  font-family:'Courier New',monospace;font-weight:bold;font-size:12px;
+  text-transform:uppercase;letter-spacing:1px;text-decoration:none;
+  color:var(--ink);background:var(--panel2);padding:9px 12px;cursor:pointer;
+  box-shadow:inset -3px -3px 0 var(--shadow),inset 3px 3px 0 var(--hl),0 0 0 3px var(--shadow);
+}
+#back:active{box-shadow:inset 3px 3px 0 var(--shadow),inset -3px -3px 0 var(--hl),0 0 0 3px var(--shadow)}
+.screen{display:none;position:fixed;inset:0;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:52px 14px 14px;text-align:center}
+.screen.active{display:flex}
+h1{font-size:clamp(30px,9vw,62px);color:var(--accent);text-shadow:4px 4px 0 var(--shadow);line-height:1}
+h2{font-size:clamp(18px,5vw,28px);color:var(--accent);text-shadow:3px 3px 0 var(--shadow)}
+.sub{color:var(--dim);font-size:12px;letter-spacing:4px}
+.hint{color:var(--dim);font-size:11px;letter-spacing:2px;line-height:1.9}
+.hi{font-size:13px;color:var(--ink)}
+.deco{display:flex;gap:5px;margin-bottom:4px}
+.deco i{width:13px;height:13px;background:var(--accent);box-shadow:2px 2px 0 var(--shadow)}
+.deco i:nth-child(odd){opacity:.75}
+.btn{
+  font-family:'Courier New',monospace;font-weight:bold;font-size:14px;
+  text-transform:uppercase;letter-spacing:2px;color:var(--ink);
+  background:var(--panel2);border:none;padding:12px 20px;cursor:pointer;
+  box-shadow:inset -4px -4px 0 var(--shadow),inset 4px 4px 0 var(--hl),0 0 0 4px var(--shadow);
+}
+.btn:active{box-shadow:inset 4px 4px 0 var(--shadow),inset -4px -4px 0 var(--hl),0 0 0 4px var(--shadow)}
+.btn.big{font-size:18px;padding:15px 30px}
+.btn.small{font-size:11px;padding:7px 10px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.lbl{width:112px;text-align:right;font-size:11px;color:var(--dim)}
+.val{min-width:130px;text-align:center;font-size:13px;color:var(--ink)}
+.arrow{font-size:12px;padding:8px 11px}
+#hud{position:fixed;top:10px;right:10px;z-index:70;display:flex;gap:10px;align-items:center;
+  font-size:11px;letter-spacing:1px}
+#hud b{color:var(--accent)}
+#hud .btn{pointer-events:auto}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:0;touch-action:none}
+canvas{image-rendering:pixelated;image-rendering:crisp-edges;
+  box-shadow:0 0 0 4px var(--shadow),0 0 26px rgba(0,0,0,.55)}
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;background:var(--overlay, rgba(0,0,0,.6));z-index:60;padding:16px}
+.overlay{background:rgba(0,0,0,.62)}
+.hidden{display:none!important}
+.panel{background:var(--panel);padding:24px 30px;display:flex;flex-direction:column;gap:14px;align-items:center;
+  box-shadow:inset -4px -4px 0 var(--shadow),inset 4px 4px 0 var(--hl),0 0 0 4px var(--shadow)}
+.big-num{font-size:clamp(26px,7vw,40px);color:var(--accent);text-shadow:3px 3px 0 var(--shadow)}
+.rec{color:var(--accent);font-size:12px;letter-spacing:2px}
+.small-note{font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+<a id="back" href="../../index.html">&#9668; НАЗАД</a>
+<div id="crt"></div>
+
+<!-- ГЛАВНОЕ МЕНЮ -->
+<section id="menu" class="screen active">
+  <div class="deco"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <h1>ЗМЕЙКА</h1>
+  <div class="sub">RETRO&nbsp;ARCADE&nbsp;&middot;&nbsp;1984</div>
+  <div class="hi" id="menuHi">РЕКОРД: 0000</div>
+  <button class="btn big" id="playBtn">&#9654; ИГРАТЬ</button>
+  <button class="btn" id="toSettings">НАСТРОЙКИ</button>
+  <div class="hint">ПК — WASD ИЛИ СТРЕЛКИ &middot; ТЕЛЕФОН — СВАЙПЫ<br>P — ПАУЗА</div>
+</section>
+
+<!-- НАСТРОЙКИ -->
+<section id="settings" class="screen">
+  <h2>НАСТРОЙКИ</h2>
+  <div class="row"><span class="lbl">СЛОЖНОСТЬ</span>
+    <button class="btn arrow" data-a="diff|-">&#9668;</button>
+    <span class="val" id="vDiff"></span>
+    <button class="btn arrow" data-a="diff|+">&#9658;</button></div>
+  <div class="row"><span class="lbl">РЕЖИМ</span>
+    <button class="btn arrow" data-a="mode|-">&#9668;</button>
+    <span class="val" id="vMode"></span>
+    <button class="btn arrow" data-a="mode|+">&#9658;</button></div>
+  <div class="row"><span class="lbl">ЗМЕЯ</span>
+    <button class="btn arrow" data-a="snake|-">&#9668;</button>
+    <span class="val" id="vSnake"></span>
+    <button class="btn arrow" data-a="snake|+">&#9658;</button></div>
+  <div class="row"><span class="lbl">ПОЛЕ</span>
+    <button class="btn arrow" data-a="field|-">&#9668;</button>
+    <span class="val" id="vField"></span>
+    <button class="btn arrow" data-a="field|+">&#9658;</button></div>
+  <div class="row"><span class="lbl">ЕДА</span>
+    <button class="btn arrow" data-a="food|-">&#9668;</button>
+    <span class="val" id="vFood"></span>
+    <button class="btn arrow" data-a="food|+">&#9658;</button></div>
+  <button class="btn big" id="toMenu1">В МЕНЮ</button>
+</section>
+
+<!-- ИГРА -->
+<section id="game" class="screen">
+  <div id="hud">
+    <span>СЧЁТ <b id="score">0000</b></span>
+    <span>РЕКОРД <b id="hi">0000</b></span>
+    <button class="btn small" id="pauseBtn">II</button>
+  </div>
+  <div id="stage"><canvas id="cv"></canvas></div>
+</section>
+
+<!-- СТАРТ -->
+<div id="readyOv" class="overlay hidden">
+  <div class="panel">
+    <div id="readyInfo" class="small-note"></div>
+    <div class="big-num">ПРИГОТОВЬСЯ!</div>
+    <button class="btn big" id="readyBtn">СТАРТ</button>
+  </div>
+</div>
+
+<!-- ПАУЗА -->
+<div id="pauseOv" class="overlay hidden">
+  <div class="panel">
+    <div class="big-num">ПАУЗА</div>
+    <button class="btn big" id="resumeBtn">ПРОДОЛЖИТЬ</button>
+    <button class="btn" id="toMenu2">В МЕНЮ</button>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="over" class="overlay hidden">
+  <div class="panel">
+    <div class="big-num" id="overTitle">GAME OVER</div>
+    <div id="recordMsg" class="rec hidden">&#9733; НОВЫЙ РЕКОРД! &#9733;</div>
+    <div class="hi">СЧЁТ: <b id="overScore">0000</b></div>
+    <div class="hi">РЕКОРД: <b id="overHi">0000</b></div>
+    <button class="btn big" id="restartBtn">ЗАНОВО</button>
+    <button class="btn" id="toMenu3">В МЕНЮ</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+var $=function(s){return document.querySelector(s);};
+
+/* ================= ДАННЫЕ ================= */
+var COLS=21, ROWS=21;
+
+var DIFFS=[
+  {name:'МЕДЛЕННО', ms:210, grow:1},
+  {name:'НОРМА',    ms:150, grow:1},
+  {name:'БЫСТРО',   ms:105, grow:1},
+  {name:'ХАРДКОР',  ms:72,  grow:2}
+];
+
+var MODES=[
+  {name:'КЛАССИКА',     wrap:false, obs:0},
+  {name:'СКВОЗЬ СТЕНЫ', wrap:true,  obs:0},
+  {name:'ЛАБИРИНТ',     wrap:false, obs:24}
+];
+
+var FIELDS=[
+  {name:'GAME BOY', page:'#0b160b', canvasBg:'#0f380f', f1:'#9bbc0f', f2:'#8bac0f',
+   wall:'#0f380f', wallTop:'#3c6a2a', ink:'#d8e8a0', dim:'#6a8a4a', accent:'#9bbc0f',
+   panel:'#16260f', panel2:'#1e3414', shadow:'#0a140a', hl:'#3c5a30'},
+  {name:'NES', page:'#050510', canvasBg:'#0b0b22', f1:'#1d1d44', f2:'#161636',
+   wall:'#5a5ad0', wallTop:'#8a8af0', ink:'#cfd2ff', dim:'#6a6aa8', accent:'#6c6cff',
+   panel:'#12122e', panel2:'#1b1b40', shadow:'#020208', hl:'#2a2a60'},
+  {name:'AMBER', page:'#0d0803', canvasBg:'#1a1004', f1:'#2b1b06', f2:'#221505',
+   wall:'#d18f00', wallTop:'#ffd070', ink:'#ffc84a', dim:'#9a7020', accent:'#ffb000',
+   panel:'#221505', panel2:'#2d1c08', shadow:'#0a0602', hl:'#4a3008'}
+];
+
+var SNAKES=[
+  {name:'ЗЕЛЁНАЯ', main:'#4ccf4c', dark:'#1d7a24', belly:'#a8f08a', eye:'#ffffff', pupil:'#0a140a'},
+  {name:'ЛЬДИНКА', main:'#4cc8e8', dark:'#1d6a9a', belly:'#a8e8f8', eye:'#ffffff', pupil:'#0a140a'},
+  {name:'ЗОЛОТАЯ', main:'#ffce3c', dark:'#a87800', belly:'#ffe89a', eye:'#ffffff', pupil:'#0a140a'},
+  {name:'ФУКСИЯ',  main:'#f058b0', dark:'#98205c', belly:'#ffa8d8', eye:'#ffffff', pupil:'#0a140a'}
+];
+
+var FOODS=[
+  {name:'ЯБЛОКО', main:'#ff5050', dark:'#9a1d1d', hi:'#ffb0b0', leaf:'#4ad84a',
+   bmp:['...l....','..ll....','..aaaa..','.aaaaaa.','.ahaaaa.','.aaaaaa.','..aaaa..','........']},
+  {name:'АЛМАЗ', main:'#4ad0ff', dark:'#1d6a9a', hi:'#d8f8ff', leaf:'#4ad0ff',
+   bmp:['...dd...','..dhhad.','.dhhaaad','dhaaaaad','daaaaaad','.daaaad.','..daad..','...dd...']},
+  {name:'МОНЕТА', main:'#ffd24a', dark:'#8a5a00', hi:'#fff2b0', leaf:'#ffd24a',
+   bmp:['..dddd..','.dhaaad.','dhhaaaad','dhaaaaad','daaaaaad','daaaaaad','.daaaad.','..dddd..']}
+];
+
+/* ================= ХРАНИЛИЩЕ ================= */
+var store={diff:1, mode:0, snake:0, field:0, food:0, hi:{}};
+try{ var saved=JSON.parse(localStorage.getItem('snake84')||'{}');
+     for(var k in saved) if(k in store) store[k]=saved[k]; }catch(e){}
+function save(){ try{ localStorage.setItem('snake84', JSON.stringify(store)); }catch(e){} }
+function hiKey(){ return DIFFS[store.diff].name+'|'+MODES[store.mode].name; }
+
+/* ================= СОСТОЯНИЕ ================= */
+var state='menu'; // menu | settings | ready | play | pause | dying | over
+var snake=[], dir={x:1,y:0}, dirQueue=[], food=null, obstacles=[];
+var score=0, foodCount=0, growPending=0, baseMs=150, tickMs=150;
+var isNewRecord=false, winFlag=false;
+var lastT=0, acc=0, tS=null;
+
+var cv=$('#cv'), ctx=cv.getContext('2d');
+var cs=16, W=COLS*cs, H=ROWS*cs;
+var dpr=Math.max(1, window.devicePixelRatio||1);
+
+/* ================= ЗВУК ================= */
+var AC=null;
+function ac(){
+  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(AC&&AC.state==='suspended') AC.resume();
+  return AC;
+}
+function beep(f,d,type,v){
+  var a=ac(); if(!a) return;
+  type=type||'square'; v=(v===undefined)?.12:v;
+  try{
+    var o=a.createOscillator(), g=a.createGain();
+    o.type=type; o.frequency.value=f;
+    g.gain.setValueAtTime(v,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,a.currentTime+d);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime+d);
+  }catch(e){}
+}
+function sfxEat(){ beep(660,.06); setTimeout(function(){beep(990,.08);},50); }
+function sfxDie(){ beep(220,.18,'sawtooth'); setTimeout(function(){beep(110,.3,'sawtooth');},140); }
+function sfxUi(){ beep(440,.05,'square',.08); }
+
+/* ================= ОФОРМЛЕНИЕ ================= */
+function applyField(){
+  var F=FIELDS[store.field], r=document.documentElement.style;
+  var map={'--page':F.page,'--ink':F.ink,'--dim':F.dim,'--accent':F.accent,
+           '--panel':F.panel,'--panel2':F.panel2,'--shadow':F.shadow,'--hl':F.hl};
+  for(var k in map) r.setProperty(k, map[k]);
+}
+
+/* ================= ЭКРАНЫ ================= */
+function hideOverlays(){
+  $('#over').classList.add('hidden');
+  $('#pauseOv').classList.add('hidden');
+  $('#readyOv').classList.add('hidden');
+}
+function showScreen(id){
+  hideOverlays();
+  var els=document.querySelectorAll('.screen');
+  for(var i=0;i<els.length;i++) els[i].classList.toggle('active', els[i].id===id);
+}
+function pad(n){ var s=String(n); while(s.length<4) s='0'+s; return s; }
+function updateMenuHi(){ $('#menuHi').textContent='РЕКОРД: '+pad(store.hi[hiKey()]||0); }
+function updateHud(){
+  $('#score').textContent=pad(score);
+  $('#hi').textContent=pad(store.hi[hiKey()]||0);
+}
+function renderSettings(){
+  $('#vDiff').textContent=DIFFS[store.diff].name;
+  $('#vMode').textContent=MODES[store.mode].name;
+  $('#vSnake').textContent=SNAKES[store.snake].name;
+  $('#vField').textContent=FIELDS[store.field].name;
+  $('#vFood').textContent=FOODS[store.food].name;
+}
+function showReady(){
+  $('#readyInfo').textContent=DIFFS[store.diff].name+' \u00b7 '+MODES[store.mode].name;
+  $('#readyOv').classList.remove('hidden');
+}
+
+/* ================= ИГРА ================= */
+function genObstacles(){
+  var n=MODES[store.mode].obs, arr=[], cx=Math.floor(COLS/2), cy=Math.floor(ROWS/2), guard=0;
+  while(arr.length<n && guard++<600){
+    var x=1+Math.floor(Math.random()*(COLS-2));
+    var y=1+Math.floor(Math.random()*(ROWS-2));
+    if(Math.abs(x-cx)<=2 && Math.abs(y-cy)<=2) continue;
+    if(y===cy && x>=cx-1 && x<=cx+5) continue;
+    var dup=false;
+    for(var i=0;i<arr.length;i++) if(arr[i].x===x&&arr[i].y===y){dup=true;break;}
+    if(!dup) arr.push({x:x,y:y});
+  }
+  return arr;
+}
+
+function spawnFood(){
+  var guard=0;
+  while(guard++<1000){
+    var x=Math.floor(Math.random()*COLS), y=Math.floor(Math.random()*ROWS);
+    var onSnake=false, onObs=false;
+    for(var i=0;i<snake.length;i++) if(snake[i].x===x&&snake[i].y===y){onSnake=true;break;}
+    for(var j=0;j<obstacles.length;j++) if(obstacles[j].x===x&&obstacles[j].y===y){onObs=true;break;}
+    if(!onSnake && !onObs){ food={x:x,y:y}; return; }
+  }
+  food=null;
+  winFlag=true; die(); // поле забито целиком — редкая победа
+}
+
+function resetRun(){
+  var cx=Math.floor(COLS/2), cy=Math.floor(ROWS/2);
+  snake=[]; for(var i=0;i<4;i++) snake.push({x:cx-1-i, y:cy});
+  dir={x:1,y:0}; dirQueue=[]; score=0; foodCount=0; growPending=0;
+  isNewRecord=false; winFlag=false;
+  baseMs=DIFFS[store.diff].ms; tickMs=baseMs;
+  obstacles=genObstacles();
+  spawnFood(); acc=0; updateHud();
+}
+
+function setDir(x,y){
+  var cur=dirQueue.length?dirQueue[dirQueue.length-1]:dir;
+  if(cur.x===x && cur.y===y) return;
+  if(cur.x===-x && cur.y===-y) return;
+  if(dirQueue.length<3) dirQueue.push({x:x,y:y});
+}
+
+function step(){
+  if(dirQueue.length) dir=dirQueue.shift();
+  var nx=snake[0].x+dir.x, ny=snake[0].y+dir.y;
+  var M=MODES[store.mode];
+  if(M.wrap){ nx=(nx+COLS)%COLS; ny=(ny+ROWS)%ROWS; }
+  else if(nx<0||ny<0||nx>=COLS||ny>=ROWS) return die();
+  for(var o=0;o<obstacles.length;o++)
+    if(obstacles[o].x===nx&&obstacles[o].y===ny) return die();
+  snake.unshift({x:nx,y:ny});
+  if(food && food.x===nx && food.y===ny){
+    score+=10; foodCount++;
+    growPending+=DIFFS[store.diff].grow;
+    tickMs=Math.max(Math.round(baseMs*.6), tickMs-3);
+    sfxEat(); spawnFood(); updateHud();
+  } else if(growPending>0){ growPending--; } else { snake.pop(); }
+  for(var i=1;i<snake.length;i++)
+    if(snake[i].x===nx&&snake[i].y===ny) return die();
+}
+
+function die(){
+  state='dying'; sfxDie();
+  var best=store.hi[hiKey()]||0;
+  if(score>best){ store.hi[hiKey()]=score; isNewRecord=true; save(); }
+  setTimeout(showGameOver, 750);
+}
+
+function showGameOver(){
+  state='over';
+  $('#overTitle').textContent = winFlag ? 'ПОЛЕ ПОЛНО!' : 'GAME OVER';
+  $('#overScore').textContent=pad(score);
+  $('#overHi').textContent=pad(store.hi[hiKey()]||0);
+  $('#recordMsg').classList.toggle('hidden', !isNewRecord);
+  $('#over').classList.remove('hidden');
+  updateHud();
+}
+
+/* ---------- переходы ---------- */
+function startRun(){ if(state!=='ready'&&state!=='pause') return; state='play'; hideOverlays(); acc=0; }
+function pauseGame(){ if(state!=='play') return; state='pause'; $('#pauseOv').classList.remove('hidden'); sfxUi(); }
+function resume(){ if(state!=='pause') return; state='play'; hideOverlays(); acc=0; lastT=0; }
+function restart(){ hideOverlays(); state='ready'; resetRun(); showReady(); sfxUi(); }
+function toMenu(){ hideOverlays(); state='menu'; showScreen('menu'); updateMenuHi(); sfxUi(); }
+
+/* ================= РИСОВАНИЕ ================= */
+function resize(){
+  var w=Math.min(window.innerWidth,640)-28;
+  var h=window.innerHeight-64;
+  cs=Math.max(8, Math.floor(Math.min(w,h)/COLS));
+  W=COLS*cs; H=ROWS*cs;
+  cv.width=W*dpr; cv.height=H*dpr;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.imageSmoothingEnabled=false;
+}
+
+function drawBorder(wrap){
+  var F=FIELDS[store.field];
+  if(wrap){
+    ctx.strokeStyle=F.accent; ctx.lineWidth=2;
+    ctx.setLineDash([cs, cs*0.6]);
+    ctx.strokeRect(1,1,W-2,H-2);
+    ctx.setLineDash([]);
+  }else{
+    var bw=Math.max(3,Math.round(cs*0.5));
+    ctx.fillStyle=F.wall;
+    ctx.fillRect(0,0,W,bw); ctx.fillRect(0,H-bw,W,bw);
+    ctx.fillRect(0,0,bw,H); ctx.fillRect(W-bw,0,bw,H);
+    ctx.fillStyle=F.wallTop;
+    var br=Math.max(2,Math.round(cs*0.16));
+    for(var x=0;x<COLS;x+=2){
+      ctx.fillRect(x*cs+2,2,cs-4,br);
+      ctx.fillRect(x*cs+2,H-bw+2,cs-4,br);
+    }
+    for(var y=0;y<ROWS;y+=2){
+      ctx.fillRect(2,y*cs+2,br,cs-4);
+      ctx.fillRect(W-bw+2,y*cs+2,br,cs-4);
+    }
+  }
+}
+
+function drawBlock(x,y){
+  var F=FIELDS[store.field];
+  var p=Math.max(1,Math.round(cs*0.12));
+  ctx.fillStyle=F.wall; ctx.fillRect(x*cs+1,y*cs+1,cs-2,cs-2);
+  ctx.fillStyle=F.wallTop; ctx.fillRect(x*cs+p,y*cs+p,cs-2*p,Math.max(2,Math.round(cs*0.2)));
+}
+
+function drawFood(x,y){
+  var f=FOODS[store.food], bmp=f.bmp, p=cs/8, ox=x*cs, oy=y*cs;
+  for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+    var ch=bmp[r].charAt(c); if(ch==='.') continue;
+    ctx.fillStyle = ch==='a'?f.main : ch==='d'?f.dark : ch==='h'?f.hi : f.leaf;
+    ctx.fillRect(ox+c*p, oy+r*p, p+.5, p+.5);
+  }
+}
+
+function drawBody(s,i,flash){
+  var S=SNAKES[store.snake];
+  var x=s.x*cs, y=s.y*cs, b=Math.max(1,Math.round(cs*0.1));
+  var fill = flash ? (i%2?'#ff5050':'#ffffff') : (i%2?S.dark:S.main);
+  ctx.fillStyle=flash?'#ff5050':S.dark; ctx.fillRect(x,y,cs,cs);
+  ctx.fillStyle=fill; ctx.fillRect(x+b,y+b,cs-2*b,cs-2*b);
+  if(!flash && i%2){
+    var d=Math.max(2,Math.round(cs*0.18));
+    ctx.fillStyle=S.belly;
+    ctx.fillRect(x+cs/2-d/2, y+cs/2-d/2, d, d);
+  }
+}
+
+function drawHead(s,flash){
+  var S=SNAKES[store.snake];
+  var x=s.x*cs, y=s.y*cs, b=Math.max(1,Math.round(cs*0.1));
+  ctx.fillStyle=flash?'#ff5050':S.dark; ctx.fillRect(x,y,cs,cs);
+  ctx.fillStyle=flash?'#ffffff':S.main; ctx.fillRect(x+b,y+b,cs-2*b,cs-2*b);
+  if(!flash){
+    var e=Math.max(2,Math.round(cs*0.15)), o=Math.round(cs*0.24);
+    var px=-dir.y, py=dir.x;
+    var ex=x+cs/2+dir.x*o, ey=y+cs/2+dir.y*o;
+    var e1x=ex+px*o-e/2, e1y=ey+py*o-e/2;
+    var e2x=ex-px*o-e/2, e2y=ey-py*o-e/2;
+    ctx.fillStyle=S.eye; ctx.fillRect(e1x,e1y,e,e); ctx.fillRect(e2x,e2y,e,e);
+    ctx.fillStyle=S.pupil;
+    var pe=Math.max(1,Math.round(e/2)), sh=Math.round(e*0.25);
+    ctx.fillRect(e1x+dir.x*sh,e1y+dir.y*sh,pe,pe);
+    ctx.fillRect(e2x+dir.x*sh,e2y+dir.y*sh,pe,pe);
+  }
+}
+
+function draw(t){
+  var F=FIELDS[store.field];
+  ctx.fillStyle=F.canvasBg; ctx.fillRect(0,0,W,H);
+  for(var y=0;y<ROWS;y++)for(var x=0;x<COLS;x++){
+    ctx.fillStyle=((x+y)%2)?F.f2:F.f1;
+    ctx.fillRect(x*cs,y*cs,cs,cs);
+  }
+  drawBorder(MODES[store.mode].wrap);
+  for(var i=0;i<obstacles.length;i++) drawBlock(obstacles[i].x, obstacles[i].y);
+  if(food) drawFood(food.x, food.y);
+  var flash=(state==='dying')&&(Math.floor(t/90)%2===0);
+  for(var j=snake.length-1;j>=0;j--){
+    if(j===0) drawHead(snake[j],flash); else drawBody(snake[j],j,flash);
+  }
+}
+
+/* ================= ЦИКЛ ================= */
+function frame(t){
+  requestAnimationFrame(frame);
+  if(!lastT) lastT=t;
+  var dt=Math.min(120, t-lastT); lastT=t;
+  if(state==='play'){
+    acc+=dt;
+    while(acc>=tickMs){ acc-=tickMs; step(); if(state!=='play') break; }
+  }
+  draw(t);
+}
+requestAnimationFrame(frame);
+
+/* ================= УПРАВЛЕНИЕ ================= */
+var DIRKEYS={w:[0,-1],a:[-1,0],s:[0,1],d:[1,0],
+  arrowup:[0,-1],arrowleft:[-1,0],arrowdown:[0,1],arrowright:[1,0]};
+
+addEventListener('keydown', function(e){
+  var k=e.key.toLowerCase();
+  if(k===' '||k==='enter'){
+    if(state==='ready') startRun();
+    else if(state==='over') restart();
+    else if(state==='pause') resume();
+    e.preventDefault(); return;
+  }
+  if(k==='p'||k==='escape'){
+    if(state==='play') pauseGame(); else if(state==='pause') resume();
+    return;
+  }
+  var d=DIRKEYS[k];
+  if(d){
+    e.preventDefault();
+    if(state==='ready') startRun();
+    setDir(d[0], d[1]);
+  }
+});
+
+var stage=$('#stage');
+stage.addEventListener('touchstart', function(e){
+  e.preventDefault();
+  tS={x:e.touches[0].clientX, y:e.touches[0].clientY};
+},{passive:false});
+stage.addEventListener('touchmove', function(e){
+  e.preventDefault();
+  if(!tS || state!=='play') return;
+  var dx=e.touches[0].clientX-tS.x, dy=e.touches[0].clientY-tS.y;
+  if(Math.abs(dx)<24 && Math.abs(dy)<24) return;
+  if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?1:-1, 0);
+  else setDir(0, dy>0?1:-1);
+  tS={x:e.touches[0].clientX, y:e.touches[0].clientY};
+},{passive:false});
+stage.addEventListener('touchend', function(){ tS=null; },{passive:false});
+stage.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+/* ================= КНОПКИ ================= */
+document.querySelectorAll('[data-a]').forEach(function(b){
+  b.addEventListener('click', function(){
+    var p=b.getAttribute('data-a').split('|');
+    var arrs={diff:DIFFS, mode:MODES, snake:SNAKES, field:FIELDS, food:FOODS};
+    var arr=arrs[p[0]];
+    store[p[0]]=(store[p[0]]+(p[1]==='+'?1:-1)+arr.length)%arr.length;
+    if(p[0]==='field') applyField();
+    renderSettings(); save(); sfxUi();
+  });
+});
+$('#playBtn').onclick=function(){ state='ready'; showScreen('game'); resetRun(); showReady(); sfxUi(); };
+$('#toSettings').onclick=function(){ state='settings'; showScreen('settings'); renderSettings(); sfxUi(); };
+$('#toMenu1').onclick=toMenu;
+$('#toMenu2').onclick=toMenu;
+$('#toMenu3').onclick=toMenu;
+$('#readyBtn').onclick=startRun;
+$('#resumeBtn').onclick=resume;
+$('#restartBtn').onclick=restart;
+$('#pauseBtn').onclick=function(){ if(state==='play') pauseGame(); else if(state==='pause') resume(); };
+
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden && state==='play') pauseGame();
+});
+
+/* ================= СТАРТ ================= */
+applyField();
+updateMenuHi();
+resize();
+addEventListener('resize', resize);
+</script>
+</body>
+</html>
