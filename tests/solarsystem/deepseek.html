@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Solar System 3D Explorer</title>
+<style>
+  :root{
+    --glass: rgba(12,17,32,.66);
+    --glass-strong: linear-gradient(160deg, rgba(22,29,52,.94), rgba(9,13,25,.96));
+    --stroke: rgba(120,150,230,.18);
+    --text: #e8eeff;
+    --muted: #8ea0c8;
+    --accent: #6fa8ff;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body{
+    background:
+      radial-gradient(1200px 820px at 72% 8%, #17224c 0%, rgba(10,14,30,0) 62%),
+      radial-gradient(900px 700px at 12% 88%, #1b1132 0%, rgba(10,14,30,0) 58%),
+      #04060d;
+    color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 3D layer ---------- */
+  #webgl{
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+  #webgl canvas{ display: block; }
+
+  /* ---------- labels ---------- */
+  .label{
+    font-size: 12px;
+    letter-spacing: .04em;
+    font-weight: 500;
+    color: #c7d8ff;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(8,13,26,.5);
+    border: 1px solid rgba(130,165,255,.18);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    text-shadow: 0 0 10px rgba(0,0,0,.85);
+    transition: color .2s ease, background .2s ease, border-color .2s ease;
+  }
+  .label.active{
+    color: #ffffff;
+    background: rgba(70,120,225,.6);
+    border-color: rgba(150,190,255,.65);
+  }
+
+  /* ---------- back button ---------- */
+  #back{
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    background: var(--glass);
+    border: 1px solid var(--stroke);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: .01em;
+    box-shadow: 0 8px 30px rgba(0,0,0,.45);
+    transition: background .2s, border-color .2s, transform .12s;
+  }
+  #back:hover{
+    background: rgba(32,44,78,.82);
+    border-color: rgba(130,170,255,.45);
+  }
+  #back:active{ transform: scale(.97); }
+  #back:focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  /* ---------- brand ---------- */
+  #brand{
+    position: fixed;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    font-size: 11px;
+    letter-spacing: .32em;
+    text-transform: uppercase;
+    color: rgba(160,185,235,.55);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ---------- controls ---------- */
+  #controls{
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 8px;
+    border-radius: 18px;
+    background: var(--glass);
+    border: 1px solid var(--stroke);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 14px 44px rgba(0,0,0,.55);
+    max-width: calc(100vw - 20px);
+  }
+
+  .ctrl{
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #b6c6ea;
+    cursor: pointer;
+    padding: 0;
+    transition: background .18s, color .18s, border-color .18s, transform .12s;
+  }
+  .ctrl:hover{
+    background: rgba(90,130,230,.18);
+    color: #fff;
+  }
+  .ctrl:active{ transform: scale(.93); }
+  .ctrl:focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .ctrl.active{
+    background: rgba(90,140,255,.26);
+    color: #fff;
+    border-color: rgba(120,170,255,.5);
+  }
+  .ctrl svg{
+    width: 19px;
+    height: 19px;
+    display: block;
+  }
+
+  .speed{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 10px 0 8px;
+    border-left: 1px solid rgba(120,150,230,.16);
+    margin-left: 4px;
+  }
+  .speed label{
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .speed input[type="range"]{
+    width: 96px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    height: 20px;
+  }
+  .speed input[type="range"]:focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+  .speed output{
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: #cfe0ff;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* ---------- info panel ---------- */
+  #info{
+    position: fixed;
+    top: 78px;
+    right: 16px;
+    width: 342px;
+    z-index: 35;
+    padding: 22px 22px 20px;
+    border-radius: 20px;
+    background: var(--glass-strong);
+    border: 1px solid var(--stroke);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 24px 70px rgba(0,0,0,.6);
+    max-height: calc(100vh - 190px);
+    overflow-y: auto;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(112%);
+    transition: transform .45s cubic-bezier(.22,1,.36,1), opacity .3s ease;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(120,150,230,.35) transparent;
+  }
+  #info::-webkit-scrollbar{ width: 6px; }
+  #info::-webkit-scrollbar-thumb{
+    background: rgba(120,150,230,.35);
+    border-radius: 99px;
+  }
+  #info.open{
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  #infoClose{
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background: rgba(255,255,255,.06);
+    color: #b6c6ea;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .18s, color .18s;
+  }
+  #infoClose:hover{ background: rgba(255,90,90,.22); color:#fff; }
+  #infoClose:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  #infoName{
+    margin: 0 0 4px;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    background: linear-gradient(100deg, #ffffff, #a9c6ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    padding-right: 34px;
+  }
+  #infoType{
+    margin: 0 0 16px;
+    font-size: 12px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  #infoStats{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+    margin: 0 0 18px;
+  }
+  #infoStats .stat{
+    background: rgba(255,255,255,.035);
+    border: 1px solid rgba(120,150,230,.12);
+    border-radius: 12px;
+    padding: 9px 11px;
+  }
+  #infoStats .stat.wide{ grid-column: 1 / -1; }
+  #infoStats dt{
+    font-size: 10px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 4px;
+  }
+  #infoStats dd{
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #eaf1ff;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #infoFact{
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #b9c9ec;
+    border-left: 2px solid rgba(111,168,255,.5);
+    padding-left: 12px;
+  }
+
+  /* ---------- help modal ---------- */
+  #help{
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(3,5,12,.66);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .28s ease, visibility .28s;
+  }
+  #help.open{ opacity: 1; visibility: visible; }
+
+  .help-card{
+    width: min(430px, 100%);
+    padding: 26px 24px 22px;
+    border-radius: 20px;
+    background: var(--glass-strong);
+    border: 1px solid var(--stroke);
+    box-shadow: 0 30px 80px rgba(0,0,0,.7);
+    transform: translateY(14px) scale(.98);
+    transition: transform .32s cubic-bezier(.22,1,.36,1);
+    max-height: 86vh;
+    overflow-y: auto;
+  }
+  #help.open .help-card{ transform: translateY(0) scale(1); }
+
+  .help-card h2{
+    margin: 0 0 16px;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: .01em;
+  }
+  .help-card ul{
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+  }
+  .help-card li{
+    display: flex;
+    gap: 10px;
+    font-size: 13.5px;
+    line-height: 1.45;
+    color: #b9c9ec;
+    align-items: baseline;
+  }
+  .help-card li b{
+    color: #fff;
+    font-weight: 600;
+    min-width: 108px;
+    flex: 0 0 auto;
+  }
+  #helpClose{
+    width: 100%;
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(120,170,255,.4);
+    background: rgba(90,140,255,.2);
+    color: #eaf1ff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .2s, border-color .2s;
+  }
+  #helpClose:hover{ background: rgba(90,140,255,.34); border-color: rgba(140,190,255,.65); }
+  #helpClose:focus-visible{ outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---------- loader ---------- */
+  #loader{
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: #04060d;
+    transition: opacity .7s ease, visibility .7s;
+  }
+  #loader.hidden{ opacity: 0; visibility: hidden; }
+  .spinner{
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 2px solid rgba(120,160,255,.16);
+    border-top-color: var(--accent);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  #loader p{
+    margin: 0;
+    font-size: 13px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 760px){
+    #brand{ display: none; }
+
+    #back{
+      top: 12px;
+      left: 12px;
+      padding: 0 15px;
+      font-size: 13px;
+      min-height: 42px;
+    }
+
+    #controls{
+      bottom: 10px;
+      gap: 2px;
+      padding: 6px;
+      border-radius: 16px;
+      width: calc(100vw - 20px);
+    }
+    .ctrl{ width: 38px; height: 38px; }
+    .ctrl svg{ width: 18px; height: 18px; }
+    .speed{
+      width: 100%;
+      justify-content: center;
+      height: 34px;
+      padding: 0;
+      margin-left: 0;
+      border-left: none;
+      border-top: 1px solid rgba(120,150,230,.14);
+      padding-top: 3px;
+      margin-top: 2px;
+    }
+    .speed input[type="range"]{ width: 132px; }
+
+    #info{
+      top: auto;
+      left: 10px;
+      right: 10px;
+      bottom: 118px;
+      width: auto;
+      max-height: 46vh;
+      padding: 20px 18px 18px;
+      transform: translateY(130%);
+    }
+    #info.open{ transform: translateY(0); }
+    #infoName{ font-size: 22px; }
+  }
+
+  @media (max-width: 380px){
+    #infoStats{ grid-template-columns: 1fr; }
+    .help-card li{ flex-direction: column; gap: 2px; }
+    .help-card li b{ min-width: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    #info, .help-card, #loader{ transition-duration: .01ms; }
+    .spinner{ animation-duration: 2.4s; }
+  }
+</style>
+</head>
+<body>
+
+<div id="webgl"></div>
+
+<a id="back" href="../../index.html" aria-label="Назад к списку проектов">← Назад</a>
+
+<div id="brand" aria-hidden="true">Solar System · 3D Explorer</div>
+
+<!-- ============ CONTROLS ============ -->
+<div id="controls" role="toolbar" aria-label="Управление сценой">
+  <button id="btnPause" class="ctrl" type="button" aria-label="Пауза анимации" title="Пауза / Продолжить">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+  </button>
+
+  <button id="btnOrbits" class="ctrl active" type="button" aria-label="Показать или скрыть орбиты" title="Орбиты">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><ellipse cx="12" cy="12" rx="9.2" ry="4.4" transform="rotate(-22 12 12)"/></svg>
+  </button>
+
+  <button id="btnLabels" class="ctrl active" type="button" aria-label="Показать или скрыть подписи" title="Подписи">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 6.5h16"/><path d="M4 12h10.5"/><path d="M4 17.5h13"/></svg>
+  </button>
+
+  <button id="btnReset" class="ctrl" type="button" aria-label="Сбросить камеру" title="Сброс камеры (R)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 12a8.2 8.2 0 1 1-2.4-5.8"/><path d="M20.4 4.2v4.4H16"/></svg>
+  </button>
+
+  <button id="btnFull" class="ctrl" type="button" aria-label="Полноэкранный режим" title="Полный экран">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5V4h5.5"/><path d="M20 9.5V4h-5.5"/><path d="M4 14.5V20h5.5"/><path d="M20 14.5V20h-5.5"/></svg>
+  </button>
+
+  <button id="btnHelp" class="ctrl" type="button" aria-label="Справка по управлению" title="Справка">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.5 2.3c-.7.34-1.1.9-1.1 1.7v.4"/><circle cx="12" cy="16.9" r="1.05" fill="currentColor" stroke="none"/></svg>
+  </button>
+
+  <div class="speed">
+    <label for="speedRange">Скорость</label>
+    <input id="speedRange" type="range" min="0" max="5" step="0.1" value="1" aria-label="Скорость анимации" />
+    <output id="speedValue" for="speedRange">1.0×</output>
+  </div>
+</div>
+
+<!-- ============ INFO PANEL ============ -->
+<aside id="info" role="region" aria-label="Информация об объекте" aria-hidden="true">
+  <button id="infoClose" type="button" aria-label="Закрыть панель информации">×</button>
+  <h2 id="infoName">—</h2>
+  <p id="infoType">—</p>
+  <dl id="infoStats">
+    <div class="stat"><dt>Диаметр</dt><dd id="infoDiameter">—</dd></div>
+    <div class="stat"><dt>Расстояние от Солнца</dt><dd id="infoDistance">—</dd></div>
+    <div class="stat"><dt>Период обращения</dt><dd id="infoPeriod">—</dd></div>
+    <div class="stat"><dt>Луны</dt><dd id="infoMoons">—</dd></div>
+    <div class="stat wide"><dt>Длина суток</dt><dd id="infoDay">—</dd></div>
+  </dl>
+  <p id="infoFact">—</p>
+</aside>
+
+<!-- ============ HELP ============ -->
+<div id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle" aria-hidden="true">
+  <div class="help-card">
+    <h2 id="helpTitle">Управление</h2>
+    <ul>
+      <li><b>Перетаскивание</b><span>вращение камеры вокруг сцены</span></li>
+      <li><b>Колесо / щипок</b><span>приближение и отдаление</span></li>
+      <li><b>ПКМ / два пальца</b><span>панорамирование</span></li>
+      <li><b>Клик по объекту</b><span>фокус камеры и карточка с данными</span></li>
+      <li><b>Клик по пустоте</b><span>снять выделение</span></li>
+      <li><b>Пробел</b><span>пауза / продолжение</span></li>
+      <li><b>R</b><span>сброс камеры</span></li>
+      <li><b>Esc</b><span>закрыть панель или справку</span></li>
+    </ul>
+    <button id="helpClose" type="button" aria-label="Закрыть справку">Понятно</button>
+  </div>
+</div>
+
+<!-- ============ LOADER ============ -->
+<div id="loader">
+  <div class="spinner"></div>
+  <p>Загрузка сцены…</p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* =========================================================
+   RENDERER / SCENE / CAMERA
+   ========================================================= */
+const container = document.getElementById('webgl');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 4000);
+const HOME_POS = new THREE.Vector3(0, 26, 52);
+const HOME_TARGET = new THREE.Vector3(0, 0, 0);
+camera.position.copy(HOME_POS);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+Object.assign(labelRenderer.domElement.style, {
+  position: 'absolute',
+  top: '0',
+  left: '0',
+  pointerEvents: 'none'
+});
+container.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.rotateSpeed = 0.62;
+controls.zoomSpeed = 0.9;
+controls.panSpeed = 0.72;
+controls.minDistance = 2.6;
+controls.maxDistance = 190;
+controls.target.copy(HOME_TARGET);
+
+/* =========================================================
+   LIGHTS
+   ========================================================= */
+const sunLight = new THREE.PointLight(0xfff3da, 3.0, 0, 0);
+scene.add(sunLight);
+scene.add(new THREE.AmbientLight(0x3a4d7d, 0.42));
+
+/* =========================================================
+   TEXTURE HELPERS
+   ========================================================= */
+function makeCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+function toTex(canvas) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.anisotropy = MAX_ANISO;
+  return t;
+}
+
+function rgba(c, a) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+const TW = 1024, TH = 512;
+
+function bandedCanvas(base, palette, count) {
+  const c = makeCanvas(TW, TH);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, TW, TH);
+  for (let i = 0; i < count; i++) {
+    const y = Math.random() * TH;
+    const bh = 6 + Math.random() * (TH * 0.11);
+    const col = palette[(Math.random() * palette.length) | 0];
+    const g = ctx.createLinearGradient(0, y, 0, y + bh);
+    g.addColorStop(0, rgba(col, 0));
+    g.addColorStop(0.5, rgba(col, 0.3 + Math.random() * 0.5));
+    g.addColorStop(1, rgba(col, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, y, TW, bh);
+  }
+  return c;
+}
+
+function spots(ctx, palette, count, rMin, rMax, aMin, aMax) {
+  for (let i = 0; i < count; i++) {
+    const x = Math.random() * TW;
+    const y = Math.random() * TH;
+    const r = rMin + Math.random() * (rMax - rMin);
+    const col = palette[(Math.random() * palette.length) | 0];
+    ctx.globalAlpha = aMin + Math.random() * (aMax - aMin);
+    ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * (0.45 + Math.random() * 0.85), Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---- Sun ---- */
+function texSun() {
+  const c = makeCanvas(TW, TH);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffb648';
+  ctx.fillRect(0, 0, TW, TH);
+  for (let i = 0; i < 300; i++) {
+    const x = Math.random() * TW;
+    const y = Math.random() * TH;
+    const r = 10 + Math.random() * 62;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    if (Math.random() > 0.5) {
+      g.addColorStop(0, 'rgba(255,244,178,0.55)');
+    } else {
+      g.addColorStop(0, 'rgba(255,124,26,0.5)');
+    }
+    g.addColorStop(1, 'rgba(255,180,60,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return c;
+}
+
+/* ---- Mercury ---- */
+function texMercury() {
+  const c = makeCanvas(TW, TH);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#8b8781';
+  ctx.fillRect(0, 0, TW, TH);
+  spots(ctx, [[120,116,110],[162,157,150],[100,97,92],[70,68,64],[145,141,134]], 300, 4, 34, 0.2, 0.65);
+  return c;
+}
+
+/* ---- Venus ---- */
+function texVenus() {
+  const c = bandedCanvas('#d9b878', [[242,224,176],[206,172,112],[250,236,200],[196,158,96]], 55);
+  const ctx = c.getContext('2d');
+  ctx.globalAlpha = 0.22;
+  spots(ctx, [[252,240,205],[190,152,92]], 80, 30, 110, 0.3, 0.7);
+  ctx.globalAlpha = 1;
+  return c;
+}
+
+/* ---- Earth ---- */
+function texEarth() {
+  const c = makeCanvas(TW, TH);
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, TH);
+  g.addColorStop(0, '#0d2a50');
+  g.addColorStop(0.5, '#14457e');
+  g.addColorStop(1, '#0d2a50');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, TW, TH);
+
+  const land = [[62,118,68],[84,140,80],[112,150,92],[152,140,92],[92,112,62],[44,96,58]];
+  ctx.filter = 'blur(4px)';
+  for (let i = 0; i < 78; i++) {
+    const x = Math.random() * TW;
+    const y = 90 + Math.random() * (TH - 180);
+    const r = 22 + Math.random() * 62;
+    const col = land[(Math.random() * land.length) | 0];
+    ctx.globalAlpha = 0.75 + Math.random() * 0.25;
+    ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * (0.5 + Math.random() * 0.8), Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+
+  const capTop = ctx.createLinearGradient(0, 0, 0, 56);
+  capTop.addColorStop(0, 'rgba(238,247,255,1)');
+  capTop.addColorStop(1, 'rgba(238,247,255,0)');
+  ctx.fillStyle = capTop;
+  ctx.fillRect(0, 0, TW, 56);
+
+  const capBot = ctx.createLinearGradient(0, TH, 0, TH - 56);
+  capBot.addColorStop(0, 'rgba(238,247,255,1)');
+  capBot.addColorStop(1, 'rgba(238,247,255,0)');
+  ctx.fillStyle = capBot;
+  ctx.fillRect(0, TH - 56, TW, 56);
+
+  return c;
+}
+
+/* ---- Mars ---- */
+function texMars() {
+  const c = makeCanvas(TW, TH);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#b1532c';
+  ctx.fillRect(0, 0, TW, TH);
+  ctx.filter = 'blur(5px)';
+  spots(ctx, [[128,60,34],[152,82,46],[96,44,26],[172,100,62],[186,120,78]], 90, 24, 90, 0.25, 0.6);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+
+  const capTop = ctx.createLinearGradient(0, 0, 0, 40);
+  capTop.addColorStop(0, 'rgba(245,248,255,0.95)');
+  capTop.addColorStop(1, 'rgba(245,248,255,0)');
+  ctx.fillStyle = capTop;
+  ctx.fillRect(0, 0, TW, 40);
+
+  const capBot = ctx.createLinearGradient(0, TH, 0, TH - 34);
+  capBot.addColorStop(0, 'rgba(245,248,255,0.85)');
+  capBot.addColorStop(1, 'rgba(245,248,255,0)');
+  ctx.fillStyle = capBot;
+  ctx.fillRect(0, TH - 34, TW, 34);
+
+  return c;
+}
+
+/* ---- Jupiter ---- */
+function texJupiter() {
+  const c = bandedCanvas('#d8c19b',
+    [[202,162,112],[242,228,198],[172,122,80],[226,206,170],[150,100,70],[236,220,188]],
+    78);
+  const ctx = c.getContext('2d');
+  const cx = 690, cy = 330, rx = 104, ry = 50;
+  const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, rx);
+  g.addColorStop(0, 'rgba(196,72,46,0.95)');
+  g.addColorStop(0.55, 'rgba(178,84,58,0.72)');
+  g.addColorStop(1, 'rgba(186,128,96,0)');
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(1, ry / rx);
+  ctx.translate(-cx, -cy);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rx, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  return c;
+}
+
+/* ---- Saturn ---- */
+function texSaturn() {
+  return bandedCanvas('#e3cfa2',
+    [[216,190,138],[246,232,198],[190,158,108],[232,212,172],[204,176,126]],
+    58);
+}
+
+/* ---- Uranus ---- */
+function texUranus() {
+  return bandedCanvas('#a7dfe6',
+    [[192,236,242],[150,206,216],[214,244,248]],
+    24);
+}
+
+/* ---- Neptune ---- */
+function texNeptune() {
+  const c = bandedCanvas('#3a62c8',
+    [[92,132,226],[58,94,190],[124,164,240],[70,110,206]],
+    34);
+  const ctx = c.getContext('2d');
+  const cx = 400, cy = 300, rx = 86, ry = 46;
+  const g = ctx.createRadialGradient(cx, cy, 3, cx, cy, rx);
+  g.addColorStop(0, 'rgba(26,42,102,0.9)');
+  g.addColorStop(1, 'rgba(26,42,102,0)');
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(1, ry / rx);
+  ctx.translate(-cx, -cy);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rx, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  return c;
+}
+
+/* ---- Rings ---- */
+function texRing() {
+  const S = 512;
+  const c = makeCanvas(S, S);
+  const ctx = c.getContext('2d');
+  const cx = S / 2, cy = S / 2, R = S / 2;
+  const steps = 300;
+  for (let i = 0; i < steps; i++) {
+    const t = i / steps;
+    const frac = 0.60 + t * 0.395;
+    if (frac > 0.735 && frac < 0.765) continue; // деление Кассини
+    const r = frac * R;
+    const lw = (0.395 * R) / steps + 1.2;
+    const n = 0.5 + 0.5 * Math.sin(t * 78) * Math.cos(t * 21 + 1.2);
+    const a = 0.14 + 0.74 * n;
+    const sh = 200 + Math.round(46 * n);
+    ctx.strokeStyle = `rgba(${sh},${sh - 24},${sh - 74},${a.toFixed(3)})`;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  return c;
+}
+
+/* ---- Glow sprite ---- */
+function texGlow() {
+  const S = 256;
+  const c = makeCanvas(S, S);
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(255,240,190,1)');
+  g.addColorStop(0.18, 'rgba(255,196,92,0.75)');
+  g.addColorStop(0.45, 'rgba(255,138,44,0.26)');
+  g.addColorStop(1, 'rgba(255,120,30,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  return c;
+}
+
+/* =========================================================
+   DATA
+   ========================================================= */
+const DATA = {
+  sun: {
+    name: 'Солнце',
+    type: 'Звезда · жёлтый карлик',
+    diameter: '~1 392 700 км',
+    distance: '— центр системы',
+    period: '—',
+    moons: '—',
+    day: '~25 земных суток',
+    fact: 'Солнце содержит около 99,86 % массы всей Солнечной системы — всё остальное приходится на планеты, спутники, астероиды и пыль.'
+  },
+  mercury: {
+    name: 'Меркурий',
+    type: 'Планета земной группы',
+    diameter: '~4 879 км',
+    distance: '~57,9 млн км',
+    period: '~88 сут',
+    moons: '0',
+    day: '~58,6 земных сут',
+    fact: 'Меркурий — самая быстрая планета: оборот вокруг Солнца занимает всего 88 земных суток. При этом его сутки длятся почти два меркурианских года.'
+  },
+  venus: {
+    name: 'Венера',
+    type: 'Планета земной группы',
+    diameter: '~12 104 км',
+    distance: '~108,2 млн км',
+    period: '~224,7 сут',
+    moons: '0',
+    day: '~243 земных сут',
+    fact: 'Венера вращается вокруг оси в обратную сторону, поэтому Солнце там восходит на западе. Её сутки длиннее года.'
+  },
+  earth: {
+    name: 'Земля',
+    type: 'Планета земной группы',
+    diameter: '~12 742 км',
+    distance: '~149,6 млн км',
+    period: '~365,25 сут',
+    moons: '1',
+    day: '~24 ч',
+    fact: 'Земля — единственная известная планета, на поверхности которой существует жидкая вода, а атмосфера защищает жизнь от жёсткого излучения.'
+  },
+  mars: {
+    name: 'Марс',
+    type: 'Планета земной группы',
+    diameter: '~6 779 км',
+    distance: '~227,9 млн км',
+    period: '~687 сут',
+    moons: '2',
+    day: '~24,6 ч',
+    fact: 'На Марсе находится вулкан Олимп высотой около 22 км — почти в три раза выше Эвереста. Это самый высокий вулкан Солнечной системы.'
+  },
+  jupiter: {
+    name: 'Юпитер',
+    type: 'Газовый гигант',
+    diameter: '~139 820 км',
+    distance: '~778,5 млн км',
+    period: '~4 333 сут',
+    moons: '~95',
+    day: '~9,9 ч',
+    fact: 'Большое красное пятно Юпитера — гигантский шторм, который наблюдают более 350 лет. Внутри него поместились бы две Земли.'
+  },
+  saturn: {
+    name: 'Сатурн',
+    type: 'Газовый гигант',
+    diameter: '~116 460 км',
+    distance: '~1 434 млн км',
+    period: '~10 759 сут',
+    moons: '~146',
+    day: '~10,7 ч',
+    fact: 'Средняя плотность Сатурна меньше плотности воды — планета могла бы «плавать» в достаточно большом океане.'
+  },
+  uranus: {
+    name: 'Уран',
+    type: 'Ледяной гигант',
+    diameter: '~50 724 км',
+    distance: '~2 871 млн км',
+    period: '~30 687 сут',
+    moons: '~28',
+    day: '~17,2 ч',
+    fact: 'Уран вращается «лёжа на боку»: наклон его оси около 98°. Поэтому каждый полюс по 42 года находится то на свету, то в тени.'
+  },
+  neptune: {
+    name: 'Нептун',
+    type: 'Ледяной гигант',
+    diameter: '~49 244 км',
+    distance: '~4 495 млн км',
+    period: '~60 190 сут',
+    moons: '~16',
+    day: '~16,1 ч',
+    fact: 'Ветры на Нептуне разгоняются до 2 100 км/ч — это самые сильные ветры, зарегистрированные в Солнечной системе.'
+  }
+};
+
+const PLANET_DEFS = [
+  { id: 'mercury', orbitR: 8.5,  radius: 0.36, orbitSpeed: 0.55, spinSpeed: 0.12,  tilt: 0.002, tex: texMercury },
+  { id: 'venus',   orbitR: 11.6, radius: 0.55, orbitSpeed: 0.42, spinSpeed: -0.05, tilt: 0.05,  tex: texVenus },
+  { id: 'earth',   orbitR: 15.0, radius: 0.60, orbitSpeed: 0.34, spinSpeed: 0.55,  tilt: 0.41,  tex: texEarth },
+  { id: 'mars',    orbitR: 18.6, radius: 0.46, orbitSpeed: 0.27, spinSpeed: 0.52,  tilt: 0.44,  tex: texMars },
+  { id: 'jupiter', orbitR: 25.5, radius: 1.55, orbitSpeed: 0.16, spinSpeed: 1.30,  tilt: 0.05,  tex: texJupiter },
+  { id: 'saturn',  orbitR: 32.5, radius: 1.30, orbitSpeed: 0.12, spinSpeed: 1.15,  tilt: 0.47,  tex: texSaturn, ring: true },
+  { id: 'uranus',  orbitR: 39.0, radius: 0.88, orbitSpeed: 0.09, spinSpeed: 0.85,  tilt: 1.71,  tex: texUranus },
+  { id: 'neptune', orbitR: 45.0, radius: 0.85, orbitSpeed: 0.07, spinSpeed: 0.80,  tilt: 0.49,  tex: texNeptune }
+];
+
+/* =========================================================
+   STARFIELD
+   ========================================================= */
+(function buildStars() {
+  const count = 2600;
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  const tmp = new THREE.Color();
+
+  for (let i = 0; i < count; i++) {
+    const r = 320 + Math.random() * 520;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+    pos[i * 3 + 1] = r * Math.cos(phi);
+    pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+
+    tmp.setHSL(0.55 + (Math.random() - 0.5) * 0.28, 0.45, 0.62 + Math.random() * 0.34);
+    col[i * 3]     = tmp.r;
+    col[i * 3 + 1] = tmp.g;
+    col[i * 3 + 2] = tmp.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 1.7,
+    sizeAttenuation: true,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false
+  });
+
+  scene.add(new THREE.Points(geo, mat));
+})();
+
+/* =========================================================
+   SUN
+   ========================================================= */
+const sunHolder = new THREE.Group();
+scene.add(sunHolder);
+
+const sunGeometry = new THREE.SphereGeometry(3, 56, 36);
+const sunMaterial = new THREE.MeshBasicMaterial({ map: toTex(texSun()) });
+const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+sunHolder.add(sunMesh);
+
+const glowMap = new THREE.CanvasTexture(texGlow());
+glowMap.colorSpace = THREE.SRGBColorSpace;
+
+const glowNear = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowMap, color: 0xffbe62, transparent: true,
+  blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.95
+}));
+glowNear.scale.setScalar(13);
+sunHolder.add(glowNear);
+
+const glowFar = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowMap, color: 0xff8a2a, transparent: true,
+  blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.38
+}));
+glowFar.scale.setScalar(26);
+sunHolder.add(glowFar);
+
+const sunBody = Object.assign({}, DATA.sun, {
+  id: 'sun',
+  radius: 3,
+  holder: sunHolder,
+  mesh: sunMesh
+});
+sunMesh.userData.body = sunBody;
+
+/* =========================================================
+   ORBITS + PLANETS
+   ========================================================= */
+const orbitGroup = new THREE.Group();
+scene.add(orbitGroup);
+
+const circlePoints = [];
+const SEGMENTS = 160;
+for (let i = 0; i <= SEGMENTS; i++) {
+  const a = (i / SEGMENTS) * Math.PI * 2;
+  circlePoints.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+}
+const circleGeometry = new THREE.BufferGeometry().setFromPoints(circlePoints);
+const orbitMaterial = new THREE.LineBasicMaterial({
+  color: 0x6b86c9,
+  transparent: true,
+  opacity: 0.3,
+  depthWrite: false
+});
+
+const ringTexture = toTex(texRing());
+ringTexture.wrapS = THREE.ClampToEdgeWrapping;
+ringTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+const clickables = [sunMesh];
+const planetObjs = [];
+
+for (const def of PLANET_DEFS) {
+  // orbit line (shared geometry, scaled per planet)
+  const orbitLine = new THREE.Line(circleGeometry, orbitMaterial);
+  orbitLine.scale.setScalar(def.orbitR);
+  orbitGroup.add(orbitLine);
+
+  // holder -> tilt -> mesh
+  const holder = new THREE.Group();
+  scene.add(holder);
+
+  const tiltGroup = new THREE.Group();
+  tiltGroup.rotation.z = def.tilt;
+  holder.add(tiltGroup);
+
+  const geometry = new THREE.SphereGeometry(def.radius, 48, 32);
+  const material = new THREE.MeshStandardMaterial({
+    map: toTex(def.tex()),
+    roughness: 0.92,
+    metalness: 0.0
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  tiltGroup.add(mesh);
+
+  // label
+  const labelEl = document.createElement('div');
+  labelEl.className = 'label';
+  labelEl.textContent = DATA[def.id].name;
+  const label = new CSS2DObject(labelEl);
+  label.position.set(0, def.radius + 0.78, 0);
+  holder.add(label);
+
+  // ring
+  let ringMesh = null;
+  if (def.ring) {
+    const ringGeo = new THREE.RingGeometry(def.radius * 1.35, def.radius * 2.25, 110, 1);
+    const ringMat = new THREE.MeshBasicMaterial({
+      map: ringTexture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      opacity: 0.95
+    });
+    ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.rotation.x = -Math.PI / 2;
+    tiltGroup.add(ringMesh);
+  }
+
+  const body = Object.assign({}, DATA[def.id], {
+    id: def.id,
+    radius: def.radius,
+    holder,
+    mesh
+  });
+  mesh.userData.body = body;
+  clickables.push(mesh);
+  if (ringMesh) {
+    ringMesh.userData.body = body;
+    clickables.push(ringMesh);
+  }
+
+  planetObjs.push({
+    def,
+    holder,
+    mesh,
+    labelEl,
+    body,
+    angle: Math.random() * Math.PI * 2
+  });
+}
+
+/* =========================================================
+   CAMERA ANIMATION STATE
+   ========================================================= */
+let camAnim = null;
+let followObj = null;
+const lastFollow = new THREE.Vector3();
+const _tmpA = new THREE.Vector3();
+const _tmpB = new THREE.Vector3();
+
+function flyTo(posFn, targetFn, duration) {
+  camAnim = {
+    fromPos: camera.position.clone(),
+    fromTarget: controls.target.clone(),
+    posFn,
+    targetFn,
+    t: 0,
+    duration
+  };
+}
+
+/* =========================================================
+   UI
+   ========================================================= */
+const infoPanel = document.getElementById('info');
+const infoName = document.getElementById('infoName');
+const infoType = document.getElementById('infoType');
+const infoDiameter = document.getElementById('infoDiameter');
+const infoDistance = document.getElementById('infoDistance');
+const infoPeriod = document.getElementById('infoPeriod');
+const infoMoons = document.getElementById('infoMoons');
+const infoDay = document.getElementById('infoDay');
+const infoFact = document.getElementById('infoFact');
+
+const btnPause = document.getElementById('btnPause');
+const btnOrbits = document.getElementById('btnOrbits');
+const btnLabels = document.getElementById('btnLabels');
+const btnReset = document.getElementById('btnReset');
+const btnFull = document.getElementById('btnFull');
+const btnHelp = document.getElementById('btnHelp');
+const speedRange = document.getElementById('speedRange');
+const speedValue = document.getElementById('speedValue');
+const helpModal = document.getElementById('help');
+
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>';
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z"/></svg>';
+
+let selectedBody = null;
+let paused = false;
+let speedMul = 1;
+
+/* ---- info panel ---- */
+function showInfo(body) {
+  infoName.textContent = body.name;
+  infoType.textContent = body.type;
+  infoDiameter.textContent = body.diameter;
+  infoDistance.textContent = body.distance;
+  infoPeriod.textContent = body.period;
+  infoMoons.textContent = body.moons;
+  infoDay.textContent = body.day;
+  infoFact.textContent = body.fact;
+  infoPanel.classList.add('open');
+  infoPanel.setAttribute('aria-hidden', 'false');
+}
+
+function hideInfo() {
+  infoPanel.classList.remove('open');
+  infoPanel.setAttribute('aria-hidden', 'true');
+}
+
+function setLabelActive(body, active) {
+  if (!body) return;
+  if (body.id === 'sun') return;
+  const entry = planetObjs.find(p => p.body === body);
+  if (entry) entry.labelEl.classList.toggle('active', active);
+}
+
+/* ---- selection ---- */
+function selectBody(body) {
+  if (selectedBody && selectedBody !== body) setLabelActive(selectedBody, false);
+  selectedBody = body;
+  setLabelActive(body, true);
+
+  showInfo(body);
+
+  const worldPos = new THREE.Vector3();
+  body.holder.getWorldPosition(worldPos);
+
+  const dir = new THREE.Vector3().subVectors(camera.position, worldPos);
+  if (dir.lengthSq() < 0.0001) dir.set(0, 0.6, 1);
+  dir.normalize();
+  if (dir.y < 0.28) {
+    dir.y = 0.28;
+    dir.normalize();
+  }
+
+  const distance = Math.max(body.radius * 5.6, 3.4);
+  const offset = dir.multiplyScalar(distance);
+
+  flyTo(
+    () => body.holder.getWorldPosition(_tmpA).add(offset),
+    () => body.holder.getWorldPosition(_tmpB),
+    1.1
+  );
+
+  followObj = body.holder;
+}
+
+function deselect() {
+  if (selectedBody) setLabelActive(selectedBody, false);
+  selectedBody = null;
+  followObj = null;
+  hideInfo();
+}
+
+function resetView() {
+  selectedBody = null;
+  followObj = null;
+  hideInfo();
+  for (const p of planetObjs) p.labelEl.classList.remove('active');
+  flyTo(() => HOME_POS, () => HOME_TARGET, 1.15);
+}
+
+/* ---- pause ---- */
+function setPaused(value) {
+  paused = value;
+  btnPause.innerHTML = paused ? ICON_PLAY : ICON_PAUSE;
+  btnPause.setAttribute('aria-label', paused ? 'Продолжить анимацию' : 'Пауза анимации');
+  btnPause.classList.toggle('active', paused);
+}
+
+/* ---- orbits / labels ---- */
+function setOrbitsVisible(visible) {
+  orbitGroup.visible = visible;
+  btnOrbits.classList.toggle('active', visible);
+  btnOrbits.setAttribute('aria-pressed', String(visible));
+}
+
+function setLabelsVisible(visible) {
+  labelRenderer.domElement.style.display = visible ? '' : 'none';
+  btnLabels.classList.toggle('active', visible);
+  btnLabels.setAttribute('aria-pressed', String(visible));
+}
+
+/* ---- help ---- */
+function openHelp() {
+  helpModal.classList.add('open');
+  helpModal.setAttribute('aria-hidden', 'false');
+}
+function closeHelp() {
+  helpModal.classList.remove('open');
+  helpModal.setAttribute('aria-hidden', 'true');
+}
+
+/* ---- events ---- */
+btnPause.addEventListener('click', () => setPaused(!paused));
+
+btnOrbits.addEventListener('click', () => setOrbitsVisible(!orbitGroup.visible));
+
+btnLabels.addEventListener('click', () => {
+  setLabelsVisible(labelRenderer.domElement.style.display === 'none');
+});
+
+btnReset.addEventListener('click', resetView);
+
+btnFull.addEventListener('click', () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    }
+  } else if (document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+});
+
+btnHelp.addEventListener('click', openHelp);
+document.getElementById('helpClose').addEventListener('click', closeHelp);
+
+helpModal.addEventListener('click', (e) => {
+  if (e.target === helpModal) closeHelp();
+});
+
+document.getElementById('infoClose').addEventListener('click', () => {
+  deselect();
+});
+
+speedRange.addEventListener('input', () => {
+  speedMul = parseFloat(speedRange.value);
+  speedValue.textContent = speedMul.toFixed(1) + '×';
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.key === ' ') {
+    e.preventDefault();
+    setPaused(!paused);
+    return;
+  }
+  if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
+    resetView();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (helpModal.classList.contains('open')) {
+      closeHelp();
+    } else {
+      deselect();
+    }
+  }
+});
+
+/* =========================================================
+   POINTER INTERACTION
+   ========================================================= */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hoveredMesh = null;
+let downX = 0, downY = 0, downTime = 0;
+
+function updatePointer(e) {
+  pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+}
+
+function setHovered(mesh) {
+  if (hoveredMesh === mesh) return;
+  hoveredMesh = mesh;
+  document.body.style.cursor = mesh ? 'pointer' : '';
+}
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (e.pointerType && e.pointerType !== 'mouse') return;
+  updatePointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(clickables, false);
+  setHovered(hits.length ? hits[0].object : null);
+});
+
+renderer.domElement.addEventListener('pointerleave', () => setHovered(null));
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  downX = e.clientX;
+  downY = e.clientY;
+  downTime = performance.now();
+});
+
+renderer.domElement.addEventListener('pointerup', (e) => {
+  const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
+  const dtms = performance.now() - downTime;
+  if (dist > 8 || dtms > 800) return;
+
+  updatePointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(clickables, false);
+
+  if (hits.length) {
+    selectBody(hits[0].object.userData.body);
+  } else {
+    deselect();
+  }
+});
+
+/* =========================================================
+   RESIZE
+   ========================================================= */
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  labelRenderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+
+/* =========================================================
+   ANIMATION LOOP
+   ========================================================= */
+const clock = new THREE.Clock();
+let loaderHidden = false;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const step = paused ? 0 : dt * speedMul;
+
+  // sun
+  sunMesh.rotation.y += step * 0.045;
+  const sunPulse = 1 + Math.sin(performance.now() * 0.0007) * 0.012;
+  glowNear.scale.setScalar(13 * sunPulse);
+  glowFar.scale.setScalar(26 * sunPulse);
+
+  // planets
+  for (let i = 0; i < planetObjs.length; i++) {
+    const p = planetObjs[i];
+    p.angle += step * p.def.orbitSpeed;
+    p.holder.position.set(
+      Math.cos(p.angle) * p.def.orbitR,
+      0,
+      Math.sin(p.angle) * p.def.orbitR
+    );
+    p.mesh.rotation.y += step * p.def.spinSpeed;
+  }
+
+  // hover pop
+  for (const mesh of clickables) {
+    const target = (mesh === hoveredMesh) ? 1.07 : 1;
+    const current = mesh.scale.x;
+    const next = current + (target - current) * 0.2;
+    if (Math.abs(next - 1) > 0.0005 || Math.abs(target - 1) > 0.0005) {
+      mesh.scale.setScalar(next);
+    } else if (current !== 1) {
+      mesh.scale.setScalar(1);
+    }
+  }
+
+  // camera animation / follow
+  if (camAnim) {
+    camAnim.t = Math.min(1, camAnim.t + dt / camAnim.duration);
+    const e = 1 - Math.pow(1 - camAnim.t, 3);
+    const tp = camAnim.targetFn();
+    const pp = camAnim.posFn();
+    camera.position.lerpVectors(camAnim.fromPos, pp, e);
+    controls.target.lerpVectors(camAnim.fromTarget, tp, e);
+    lastFollow.copy(tp);
+    if (camAnim.t >= 1) camAnim = null;
+  } else if (followObj) {
+    followObj.getWorldPosition(_tmpA);
+    _tmpB.subVectors(_tmpA, lastFollow);
+    camera.position.add(_tmpB);
+    controls.target.add(_tmpB);
+    lastFollow.copy(_tmpA);
+  }
+
+  controls.update();
+
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+
+  if (!loaderHidden) {
+    loaderHidden = true;
+    const loader = document.getElementById('loader');
+    loader.classList.add('hidden');
+    window.setTimeout(() => loader.remove(), 800);
+  }
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+setPaused(false);
+setOrbitsVisible(true);
+setLabelsVisible(true);
+speedValue.textContent = '1.0×';  
+
+animate();
+</script>
+</body>
+</html>

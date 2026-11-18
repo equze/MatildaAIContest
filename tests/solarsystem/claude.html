@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solar System 3D Explorer</title>
+<style>
+:root{
+  --bg:#050812;
+  --panel:rgba(12,18,36,.84);
+  --panel-solid:#0c1224;
+  --line:rgba(160,190,255,.18);
+  --text:#e8eefc;
+  --muted:#8fa0c4;
+  --accent:#ffb84d;
+  --focus:#7fc4ff;
+  --radius:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+#stage{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 35%,#0d1632 0%,#050812 55%,#020308 100%)}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+
+button,a{font:inherit}
+button{
+  color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--line);
+  border-radius:10px;padding:8px 11px;min-width:40px;min-height:40px;cursor:pointer;
+  transition:background .2s,border-color .2s,transform .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+button:hover{background:rgba(255,255,255,.12);border-color:rgba(160,190,255,.35)}
+button:active{transform:scale(.96)}
+button[aria-pressed="true"]{background:rgba(127,196,255,.18);border-color:var(--focus)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+
+/* Назад */
+.back{
+  position:fixed;top:max(14px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));z-index:25;
+  display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;
+  background:var(--panel);border:1px solid var(--line);color:var(--text);text-decoration:none;
+  font-size:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);min-height:44px;
+}
+.back:hover{border-color:rgba(160,190,255,.4);background:rgba(20,30,56,.9)}
+
+.title{
+  position:fixed;top:22px;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;
+  font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);white-space:nowrap;
+}
+
+/* Лоадер */
+.loader{
+  position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  background:var(--bg);transition:opacity .6s ease;
+}
+.loader.done{opacity:0;pointer-events:none}
+.loader .spin{width:44px;height:44px;border-radius:50%;border:3px solid rgba(255,255,255,.12);border-top-color:var(--accent);animation:rot 1s linear infinite}
+.loader p{margin:0;color:var(--muted);font-size:14px}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* Подписи */
+#labels{position:fixed;inset:0;pointer-events:none;z-index:4;overflow:hidden}
+.label{
+  position:absolute;left:0;top:0;white-space:nowrap;font-size:12px;color:#dfe8ff;
+  background:rgba(10,16,32,.55);border:1px solid var(--line);padding:3px 8px;border-radius:999px;
+  transform:translate(-50%,-100%);will-change:transform;opacity:1;transition:opacity .25s,border-color .25s,color .25s;
+}
+.label.active{border-color:var(--accent);color:#fff}
+.hidden-layer{display:none!important}
+
+/* Панель управления */
+.toolbar{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));z-index:15;
+  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;padding:8px;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);max-width:calc(100vw - 20px);
+}
+.speed{display:flex;align-items:center;gap:8px;padding:0 8px;color:var(--muted);font-size:13px;min-height:40px}
+.speed input{width:110px;accent-color:var(--accent);cursor:pointer}
+.speed output{min-width:38px;color:var(--text);font-variant-numeric:tabular-nums}
+.sep{width:1px;height:24px;background:var(--line);margin:0 2px}
+
+/* Инфо-панель */
+.panel{
+  position:fixed;z-index:12;top:76px;right:16px;bottom:100px;width:340px;max-width:calc(100vw - 32px);
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  padding:22px 22px 20px;overflow:auto;
+  transform:translateX(calc(100% + 30px));visibility:hidden;
+  transition:transform .45s cubic-bezier(.2,.8,.2,1),visibility .45s;
+  box-shadow:0 20px 60px rgba(0,0,0,.45);
+}
+.panel.open{transform:none;visibility:visible}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px}
+.panel h2{margin:0;font-size:24px;font-weight:650;letter-spacing:.01em}
+.panel .kind{margin:4px 0 16px;color:var(--accent);font-size:13px}
+.panel dl{margin:0 0 16px;display:grid;grid-template-columns:1fr;gap:10px}
+.panel .row{display:flex;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid rgba(160,190,255,.1);font-size:14px}
+.panel dt{color:var(--muted)}
+.panel dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.fact{
+  margin:0;padding:14px 16px;border-radius:12px;background:rgba(255,184,77,.08);
+  border:1px solid rgba(255,184,77,.22);font-size:14px;line-height:1.5;color:#f3e7d2;
+}
+.fact b{display:block;margin-bottom:4px;color:var(--accent);font-weight:600;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.close{min-width:40px;min-height:40px;padding:0;font-size:20px;line-height:1;flex-shrink:0}
+
+/* Справка */
+.help-backdrop{
+  position:fixed;inset:0;z-index:30;background:rgba(2,4,10,.6);display:flex;align-items:center;justify-content:center;padding:16px;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+.help-backdrop[hidden]{display:none}
+.help{
+  width:100%;max-width:440px;max-height:86vh;overflow:auto;background:var(--panel-solid);border:1px solid var(--line);
+  border-radius:var(--radius);padding:22px;box-shadow:0 30px 80px rgba(0,0,0,.6);
+}
+.help-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.help h2{margin:0;font-size:20px}
+.help ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.help li{display:flex;justify-content:space-between;gap:14px;font-size:14px;color:var(--text);padding-bottom:9px;border-bottom:1px solid rgba(160,190,255,.1)}
+.help li span:last-child{color:var(--muted);text-align:right}
+kbd{font-family:inherit;font-size:12px;padding:2px 7px;border-radius:6px;border:1px solid var(--line);background:rgba(255,255,255,.06)}
+
+/* Адаптив */
+@media (max-width:900px){
+  .title{display:none}
+}
+@media (max-width:720px){
+  .panel{
+    top:auto;right:10px;left:10px;bottom:auto;width:auto;max-width:none;
+    bottom:calc(env(safe-area-inset-bottom) + 146px);max-height:42vh;padding:16px 16px 14px;
+    transform:translateY(calc(100% + 40px));
+  }
+  .panel.open{transform:none}
+  .panel h2{font-size:20px}
+  .panel dl{gap:6px;margin-bottom:12px}
+  .panel .row{padding-bottom:6px;font-size:13px}
+  .toolbar{width:calc(100vw - 16px);max-width:none;gap:4px;padding:6px}
+  .toolbar button{min-width:40px;padding:6px 8px}
+  .speed{width:100%;justify-content:center;order:-1}
+  .speed input{width:60%}
+  .sep{display:none}
+  .back{padding:8px 12px;min-height:40px;font-size:13px}
+  .label{font-size:11px;padding:2px 6px}
+}
+@media (prefers-reduced-motion:reduce){
+  .panel,.loader,button{transition:none}
+}
+</style>
+</head>
+<body>
+
+<a class="back" href="../../index.html" aria-label="Назад на главную страницу">← Назад</a>
+
+<div class="title">Solar System 3D Explorer</div>
+
+<div class="loader" id="loader" role="status" aria-live="polite">
+  <div class="spin" aria-hidden="true"></div>
+  <p>Загрузка сцены…</p>
+</div>
+
+<div id="stage" aria-label="3D-модель Солнечной системы"></div>
+<div id="labels"></div>
+
+<aside class="panel" id="panel" aria-labelledby="panel-title" aria-hidden="true">
+  <div class="panel-head">
+    <h2 id="panel-title"></h2>
+    <button class="close" id="closePanel" aria-label="Закрыть информационную панель">×</button>
+  </div>
+  <div class="kind" id="p-kind"></div>
+  <dl>
+    <div class="row"><dt>Диаметр</dt><dd id="p-diameter"></dd></div>
+    <div class="row"><dt>Расстояние от Солнца</dt><dd id="p-distance"></dd></div>
+    <div class="row"><dt>Период обращения</dt><dd id="p-period"></dd></div>
+    <div class="row"><dt>Лун (приблизительно)</dt><dd id="p-moons"></dd></div>
+    <div class="row"><dt>Длина суток</dt><dd id="p-day"></dd></div>
+  </dl>
+  <p class="fact"><b>Интересный факт</b><span id="p-fact"></span></p>
+</aside>
+
+<div class="toolbar" role="toolbar" aria-label="Управление сценой">
+  <button id="btnPause" aria-label="Пауза анимации" aria-pressed="false" title="Пауза (Space)">❚❚</button>
+  <div class="speed">
+    <label for="speed">Скорость</label>
+    <input id="speed" type="range" min="0" max="5" step="0.1" value="1" aria-label="Скорость анимации от 0 до 5">
+    <output id="speedOut" for="speed" aria-live="polite">x1.0</output>
+  </div>
+  <span class="sep" aria-hidden="true"></span>
+  <button id="btnOrbits" aria-label="Показать или скрыть орбиты" aria-pressed="true" title="Орбиты">◯</button>
+  <button id="btnLabels" aria-label="Показать или скрыть подписи" aria-pressed="true" title="Подписи">Aa</button>
+  <button id="btnReset" aria-label="Сбросить положение камеры (R)" title="Сброс камеры (R)">⟲</button>
+  <button id="btnFull" aria-label="Полноэкранный режим" aria-pressed="false" title="Полный экран">⛶</button>
+  <button id="btnHelp" aria-label="Справка по управлению" aria-expanded="false" aria-controls="help" title="Справка">?</button>
+</div>
+
+<div class="help-backdrop" id="help" hidden>
+  <div class="help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="help-head">
+      <h2 id="help-title">Управление</h2>
+      <button class="close" id="closeHelp" aria-label="Закрыть справку">×</button>
+    </div>
+    <ul>
+      <li><span>Вращение камеры</span><span>ЛКМ / один палец</span></li>
+      <li><span>Масштаб</span><span>Колесо / щипок</span></li>
+      <li><span>Панорама</span><span>ПКМ / два пальца</span></li>
+      <li><span>Выбор объекта</span><span>Клик / касание</span></li>
+      <li><span>Пауза / продолжить</span><kbd>Space</kbd></li>
+      <li><span>Сброс камеры</span><kbd>R</kbd></li>
+      <li><span>Закрыть панель или справку</span><kbd>Esc</kbd></li>
+    </ul>
+  </div>
+</div>
+
+<script>
+function loadScript(urls, onOk) {
+  let i = 0;
+  (function next() {
+    if (i >= urls.length) {
+      const p = document.querySelector("#loader p");
+      if (p) p.textContent = "Не удалось загрузить 3D-библиотеку. Проверьте интернет и обновите страницу.";
+      console.error("Не удалось загрузить: " + urls.join(", "));
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = urls[i++];
+    s.onload = onOk;
+    s.onerror = next;
+    document.head.appendChild(s);
+  })();
+}
+
+function startApp() {
+  // основной код, см. шаг 2
+}
+
+loadScript([
+  "https://unpkg.com/three@0.128.0/build/three.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+  "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"
+], function () {
+  loadScript([
+    "https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js",
+    "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"
+  ], startApp);
+});
+</script>
+<script>
+function startApp() {
+  "use strict";
+
+  /* ---------- Данные ---------- */
+  const DATA = {
+    sun: {
+      name: "Солнце", kind: "Звезда, жёлтый карлик (G2V)", diameter: "~1 392 700 км",
+      distance: "—", period: "—", moons: "—", day: "—",
+      fact: "Содержит ~99,86% массы Солнечной системы.", color: "#ffb84d"
+    },
+    mercury: {
+      name: "Меркурий", kind: "Каменистая планета", diameter: "~4 879 км",
+      distance: "~57,9 млн км", period: "~88 сут", moons: "0", day: "~58,6 земных сут",
+      fact: "Днём здесь жарко до ~430 °C, а ночью температура падает до ~−180 °C.", color: "#b8b0a8"
+    },
+    venus: {
+      name: "Венера", kind: "Каменистая планета", diameter: "~12 104 км",
+      distance: "~108,2 млн км", period: "~224,7 сут", moons: "0", day: "~243 земных сут",
+      fact: "Сутки на Венере длиннее её года, а вращается она в обратную сторону.", color: "#e8c98a"
+    },
+    earth: {
+      name: "Земля", kind: "Каменистая планета", diameter: "~12 742 км",
+      distance: "~149,6 млн км", period: "~365,25 сут", moons: "1", day: "~24 ч",
+      fact: "Единственная известная планета, на которой существует жизнь.", color: "#3f8fd6"
+    },
+    mars: {
+      name: "Марс", kind: "Каменистая планета", diameter: "~6 779 км",
+      distance: "~227,9 млн км", period: "~687 сут", moons: "2", day: "~24,6 ч",
+      fact: "На Марсе находится Олимп — самый высокий известный вулкан Солнечной системы.", color: "#d86a3c"
+    },
+    jupiter: {
+      name: "Юпитер", kind: "Газовый гигант", diameter: "~139 820 км",
+      distance: "~778,5 млн км", period: "~4 333 сут", moons: "~95", day: "~9,9 ч",
+      fact: "Большое Красное Пятно — штормовой вихрь, который наблюдается уже более 150 лет.", color: "#d9a676"
+    },
+    saturn: {
+      name: "Сатурн", kind: "Газовый гигант", diameter: "~116 460 км",
+      distance: "~1 434 млн км", period: "~10 759 сут", moons: "~146", day: "~10,7 ч",
+      fact: "Средняя плотность Сатурна меньше плотности воды: в достаточно большой ванне он бы плавал.", color: "#e6cf9b"
+    },
+    uranus: {
+      name: "Уран", kind: "Ледяной гигант", diameter: "~50 724 км",
+      distance: "~2 871 млн км", period: "~30 687 сут", moons: "~28", day: "~17,2 ч",
+      fact: "Ось вращения наклонена почти на 98°, поэтому планета будто катится по орбите на боку.", color: "#7fe0e6"
+    },
+    neptune: {
+      name: "Нептун", kind: "Ледяной гигант", diameter: "~49 244 км",
+      distance: "~4 495 млн км", period: "~60 190 сут", moons: "~16", day: "~16,1 ч",
+      fact: "Ветры на Нептуне — самые быстрые в Солнечной системе, местами до ~2 100 км/ч.", color: "#4a7ef0"
+    }
+  };
+
+  /* Конфигурация планет: r — радиус орбиты (условный), size — радиус тела,
+     omega зависит от периода (сжатая шкала), spin — скорость вращения вокруг оси */
+  const PLANETS = [
+    { key: "mercury", r: 14,  size: 0.5, periodDays: 88,    spinDays: 58.6,  tilt: 0.03, tex: "mercury" },
+    { key: "venus",   r: 20,  size: 0.9, periodDays: 224.7, spinDays: -243,  tilt: 3.10, tex: "venus" },
+    { key: "earth",   r: 27,  size: 1.0, periodDays: 365.25,spinDays: 1,     tilt: 0.41, tex: "earth" },
+    { key: "mars",    r: 35,  size: 0.7, periodDays: 687,   spinDays: 1.03,  tilt: 0.44, tex: "mars" },
+    { key: "jupiter", r: 55,  size: 2.8, periodDays: 4333,  spinDays: 0.41,  tilt: 0.05, tex: "jupiter" },
+    { key: "saturn",  r: 75,  size: 2.5, periodDays: 10759, spinDays: 0.45,  tilt: 0.47, tex: "saturn", ring: true },
+    { key: "uranus",  r: 95,  size: 1.8, periodDays: 30687, spinDays: -0.72, tilt: 1.71, tex: "uranus" },
+    { key: "neptune", r: 115, size: 1.7, periodDays: 60190, spinDays: 0.67,  tilt: 0.49, tex: "neptune" }
+  ];
+  const SUN_SIZE = 5;
+  const HOME_OFFSET = new THREE.Vector3(0, 60, 110);
+  const HOME_TARGET = new THREE.Vector3(0, 0, 0);
+
+  /* ---------- Состояние ---------- */
+  const state = {
+    paused: false,
+    speed: 1,
+    orbits: true,
+    labels: true
+  };
+  const bodies = [];        // { key, mesh, mat, size, hover, spin, omega, orbit, label }
+  const interactables = [];
+  let hovered = null;
+  let selectedKey = null;
+  let follow = null;        // объект, за которым следует камера после фокуса
+  const tween = { active: false, t0: 0, dur: 1200, startPos: new THREE.Vector3(), startTarget: new THREE.Vector3(), offset: new THREE.Vector3(), obj: null };
+  const pointer = { x: 0, y: 0, inside: false, down: null, moved: false };
+
+  /* ---------- Рендерер и сцена ---------- */
+  const stage = document.getElementById("stage");
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 3000);
+  camera.position.copy(HOME_OFFSET);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.enablePan = true;
+  controls.minDistance = 4;
+  controls.maxDistance = 400;
+  controls.target.copy(HOME_TARGET);
+
+  /* ---------- Освещение ---------- */
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  const sunLight = new THREE.PointLight(0xffe7b0, 34, 0, 1);
+  scene.add(sunLight);
+
+  /* ---------- Текстуры ---------- */
+  function canvasTexture(w, h, draw) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const g = c.getContext("2d");
+    draw(g, w, h);
+    return new THREE.CanvasTexture(c);
+  }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function bandTexture(colors, spotColors, spotCount) {
+    return canvasTexture(512, 256, (g, w, h) => {
+      let y = 0;
+      while (y < h) {
+        const bh = rnd(6, 26);
+        g.fillStyle = pick(colors);
+        g.fillRect(0, y, w, bh);
+        y += bh;
+      }
+      for (let i = 0; i < spotCount; i++) {
+        g.globalAlpha = rnd(0.12, 0.3);
+        g.fillStyle = pick(spotColors);
+        g.beginPath();
+        g.ellipse(rnd(0, w), rnd(0, h), rnd(8, 40), rnd(2, 8), 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.globalAlpha = 1;
+    });
+  }
+
+  function makeTexture(name) {
+    switch (name) {
+      case "mercury":
+        return canvasTexture(512, 256, (g, w, h) => {
+          g.fillStyle = "#8c8580"; g.fillRect(0, 0, w, h);
+          for (let i = 0; i < 260; i++) {
+            const x = rnd(0, w), y = rnd(0, h), r = rnd(1, 9);
+            g.fillStyle = "rgba(60,55,52,0.35)";
+            g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+            g.fillStyle = "rgba(210,205,200,0.18)";
+            g.beginPath(); g.arc(x + r * 0.25, y - r * 0.25, r * 0.7, 0, Math.PI * 2); g.fill();
+          }
+        });
+      case "venus":
+        return bandTexture(["#e8c98a", "#f0d9a0", "#d9b470"], ["#fff1c9", "#c99a4f"], 40);
+      case "earth":
+        return canvasTexture(512, 256, (g, w, h) => {
+          g.fillStyle = "#1e5fb8"; g.fillRect(0, 0, w, h);
+          g.fillStyle = "#3f8f4a";
+          for (let i = 0; i < 26; i++) {
+            g.globalAlpha = rnd(0.6, 0.95);
+            g.beginPath(); g.ellipse(rnd(0, w), rnd(h * 0.15, h * 0.85), rnd(10, 45), rnd(6, 26), rnd(0, 3), 0, Math.PI * 2); g.fill();
+          }
+          g.globalAlpha = 0.7; g.fillStyle = "#ffffff";
+          for (let i = 0; i < 40; i++) {
+            g.beginPath(); g.ellipse(rnd(0, w), rnd(0, h), rnd(12, 40), rnd(3, 8), 0, 0, Math.PI * 2); g.fill();
+          }
+          g.globalAlpha = 1;
+          g.fillStyle = "#eef6ff";
+          g.fillRect(0, 0, w, 12); g.fillRect(0, h - 12, w, 12);
+        });
+      case "mars":
+        return canvasTexture(512, 256, (g, w, h) => {
+          g.fillStyle = "#b5532c"; g.fillRect(0, 0, w, h);
+          for (let i = 0; i < 45; i++) {
+            g.globalAlpha = rnd(0.15, 0.35);
+            g.fillStyle = pick(["#7a3320", "#d97a48", "#8e3e22"]);
+            g.beginPath(); g.ellipse(rnd(0, w), rnd(0, h), rnd(10, 50), rnd(4, 14), 0, 0, Math.PI * 2); g.fill();
+          }
+          g.globalAlpha = 0.9; g.fillStyle = "#f2ece6";
+          g.beginPath(); g.ellipse(w / 2, 6, 80, 10, 0, 0, Math.PI * 2); g.fill();
+          g.beginPath(); g.ellipse(w / 2, h - 6, 80, 10, 0, 0, Math.PI * 2); g.fill();
+          g.globalAlpha = 1;
+        });
+      case "jupiter":
+        return canvasTexture(512, 256, (g, w, h) => {
+          const cols = ["#c99a6b", "#e8d3b0", "#a86e46", "#f2e6cf", "#d08c5a", "#b97d52"];
+          let y = 0;
+          while (y < h) {
+            const bh = rnd(10, 26);
+            g.fillStyle = pick(cols); g.fillRect(0, y, w, bh); y += bh;
+          }
+          for (let i = 0; i < 60; i++) {
+            g.globalAlpha = rnd(0.08, 0.2);
+            g.fillStyle = pick(["#fff4e0", "#8c5a3a"]);
+            g.beginPath(); g.ellipse(rnd(0, w), rnd(0, h), rnd(20, 70), rnd(2, 6), 0, 0, Math.PI * 2); g.fill();
+          }
+          g.globalAlpha = 0.95; g.fillStyle = "#c2553a";
+          g.beginPath(); g.ellipse(w * 0.7, h * 0.66, 40, 14, 0, 0, Math.PI * 2); g.fill();
+          g.globalAlpha = 1;
+        });
+      case "saturn":
+        return bandTexture(["#e6cf9b", "#f3e3b5", "#d7b97c", "#ecd9a6"], ["#fff3d1", "#b98f55"], 30);
+      case "uranus":
+        return bandTexture(["#8fe6ea", "#72d3da", "#a6f0f2", "#7fdde3"], ["#e4fbff"], 14);
+      case "neptune":
+        return bandTexture(["#2f5fd0", "#3a6fe0", "#284fb0", "#4a7ef0"], ["#e8f0ff", "#1c3f9a"], 26);
+      default:
+        return null;
+    }
+  }
+
+  function sunTexture() {
+    return canvasTexture(512, 256, (g, w, h) => {
+      const grd = g.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 2);
+      grd.addColorStop(0, "#fff6c8");
+      grd.addColorStop(0.45, "#ffc23d");
+      grd.addColorStop(0.85, "#ff8a1f");
+      grd.addColorStop(1, "#ff6a12");
+      g.fillStyle = grd; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 60; i++) {
+        g.globalAlpha = rnd(0.05, 0.12);
+        g.fillStyle = "#ffe08a";
+        g.beginPath(); g.ellipse(rnd(0, w), rnd(0, h), rnd(10, 40), rnd(3, 10), 0, 0, Math.PI * 2); g.fill();
+      }
+      g.globalAlpha = 1;
+    });
+  }
+
+  function glowTexture(inner, outer) {
+    return canvasTexture(256, 256, (g, w, h) => {
+      const grd = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+      grd.addColorStop(0, inner);
+      grd.addColorStop(0.35, outer);
+      grd.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    });
+  }
+
+  /* ---------- Звёздный фон ---------- */
+  (function buildStars() {
+    const count = 3500;
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const u = Math.random() * 2 - 1;
+      const t = Math.random() * Math.PI * 2;
+      const r = rnd(380, 900);
+      const s = Math.sqrt(1 - u * u);
+      pos[i * 3] = r * s * Math.cos(t);
+      pos[i * 3 + 1] = r * u;
+      pos[i * 3 + 2] = r * s * Math.sin(t);
+      const tint = pick([[1, 1, 1], [0.8, 0.88, 1], [1, 0.93, 0.8]]);
+      const k = rnd(0.5, 1);
+      col[i * 3] = tint[0] * k; col[i * 3 + 1] = tint[1] * k; col[i * 3 + 2] = tint[2] * k;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({ size: 1.4, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false });
+    scene.add(new THREE.Points(geo, mat));
+  })();
+
+  /* ---------- Общие геометрии ---------- */
+  const sphereGeo = new THREE.SphereGeometry(1, 48, 32);
+  const sunGeo = new THREE.SphereGeometry(1, 64, 48);
+  const orbitsGroup = new THREE.Group();
+  scene.add(orbitsGroup);
+
+  /* ---------- Солнце ---------- */
+  const sunMat = new THREE.MeshBasicMaterial({ map: sunTexture() });
+  const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  sunMesh.scale.setScalar(SUN_SIZE);
+  sunMesh.userData.key = "sun";
+  scene.add(sunMesh);
+  interactables.push(sunMesh);
+
+  const coronaInner = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture("rgba(255,220,140,0.9)", "rgba(255,150,60,0.25)"),
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
+  }));
+  coronaInner.scale.setScalar(SUN_SIZE * 3.2);
+  scene.add(coronaInner);
+
+  const coronaOuter = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture("rgba(255,170,80,0.35)", "rgba(255,110,40,0.08)"),
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8
+  }));
+  coronaOuter.scale.setScalar(SUN_SIZE * 7);
+  scene.add(coronaOuter);
+
+  bodies.push({
+    key: "sun", mesh: sunMesh, mat: null, size: SUN_SIZE, hover: 0,
+    spin: 0.15, omega: 0, orbit: null, isSun: true, focusDist: 30
+  });
+
+  /* ---------- Планеты, орбиты, подписи ---------- */
+  const orbitMat = new THREE.LineBasicMaterial({ color: 0x7f97cc, transparent: true, opacity: 0.35 });
+  const hiddenEmissive = new THREE.Color(0x3a4a78);
+  const labelsBox = document.getElementById("labels");
+
+  // Подпись Солнца
+  const sunLabel = document.createElement("div");
+  sunLabel.className = "label";
+  sunLabel.textContent = DATA.sun.name;
+  labelsBox.appendChild(sunLabel);
+  bodies[0].label = sunLabel;
+
+  PLANETS.forEach((p) => {
+    // Орбита
+    const pts = [];
+    for (let i = 0; i <= 256; i++) {
+      const a = (i / 256) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(a) * p.r, 0, Math.sin(a) * p.r));
+    }
+    const orbitLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), orbitMat);
+    orbitsGroup.add(orbitLine);
+
+    // Иерархия: orbit (угол) -> tiltGroup (позиция + наклон оси) -> mesh (вращение)
+    const orbit = new THREE.Group();
+    scene.add(orbit);
+    const tiltGroup = new THREE.Group();
+    tiltGroup.position.x = p.r;
+    tiltGroup.rotation.z = p.tilt;
+    orbit.add(tiltGroup);
+
+    const mat = new THREE.MeshStandardMaterial({
+      map: makeTexture(p.tex), roughness: 0.85, metalness: 0, emissive: new THREE.Color(0x000000)
+    });
+    const mesh = new THREE.Mesh(sphereGeo, mat);
+    mesh.scale.setScalar(p.size);
+    mesh.userData.key = p.key;
+    tiltGroup.add(mesh);
+    interactables.push(mesh);
+
+    if (p.ring) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(1.45, 2.35, 128),
+        new THREE.MeshBasicMaterial({ color: 0xd8c39a, side: THREE.DoubleSide, transparent: true, opacity: 0.55, depthWrite: false })
+      );
+      ring.rotation.x = Math.PI / 2;
+      mesh.add(ring);
+    }
+
+    // Подпись планеты
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = DATA[p.key].name;
+    labelsBox.appendChild(label);
+
+    bodies.push({
+      key: p.key, mesh, mat, size: p.size, hover: 0,
+      spin: (Math.sign(p.spinDays) || 1) * 1.2 / Math.pow(Math.abs(p.spinDays), 0.35),
+      omega: 0.5 * Math.sqrt(365.25 / p.periodDays),
+      orbit, isSun: false, focusDist: p.size * 5 + 7,
+      label
+    });
+  });
+
+  /* ---------- Панель ---------- */
+  const panel = document.getElementById("panel");
+  const el = {
+    title: document.getElementById("panel-title"),
+    kind: document.getElementById("p-kind"),
+    diameter: document.getElementById("p-diameter"),
+    distance: document.getElementById("p-distance"),
+    period: document.getElementById("p-period"),
+    moons: document.getElementById("p-moons"),
+    day: document.getElementById("p-day"),
+    fact: document.getElementById("p-fact")
+  };
+
+  function openPanel(key) {
+    const d = DATA[key];
+    el.title.textContent = d.name;
+    el.title.style.color = d.color;
+    el.kind.textContent = d.kind;
+    el.diameter.textContent = d.diameter;
+    el.distance.textContent = d.distance;
+    el.period.textContent = d.period;
+    el.moons.textContent = d.moons === "—" || d.moons === "0" ? d.moons : d.moons;
+    el.day.textContent = d.day;
+    el.fact.textContent = d.fact;
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+  }
+  function closePanel() {
+    panel.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+  }
+
+  /* ---------- Камера: фокус и сброс ---------- */
+  function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  function startTween(obj, offset) {
+    tween.active = true;
+    tween.t0 = performance.now();
+    tween.dur = 1300;
+    tween.obj = obj;
+    tween.startPos.copy(camera.position);
+    tween.startTarget.copy(controls.target);
+    tween.offset.copy(offset);
+    follow = null;
+  }
+
+  function focusBody(b) {
+    let dir = camera.position.clone().sub(controls.target);
+    if (dir.lengthSq() < 0.0001) dir.set(0, 0.35, 1);
+    dir.normalize().multiplyScalar(b.focusDist);
+    dir.y = Math.max(dir.y, b.focusDist * 0.25); // чуть сверху, чтобы объект читался
+    startTween(b, dir);
+  }
+
+  function resetCamera() {
+    deselect();
+    closePanel();
+    startTween(null, HOME_OFFSET);
+  }
+
+  function select(key) {
+    const b = bodies.find((x) => x.key === key);
+    if (!b) return;
+    selectedKey = key;
+    openPanel(key);
+    focusBody(b);
+  }
+
+  function deselect() {
+    selectedKey = null;
+    follow = null;
+  }
+
+  /* ---------- Взаимодействие мышью/касанием ---------- */
+  const raycaster = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+
+  function setNDC(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function pickAt() {
+    if (!pointer.inside) return null;
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(interactables, false);
+    return hits.length ? hits[0].object.userData.key : null;
+  }
+
+  const dom = renderer.domElement;
+  dom.addEventListener("pointermove", (e) => {
+    setNDC(e.clientX, e.clientY);
+    pointer.inside = true;
+    if (pointer.down) {
+      if (Math.hypot(e.clientX - pointer.down.x, e.clientY - pointer.down.y) > 8) pointer.moved = true;
+    }
+  });
+  dom.addEventListener("pointerleave", () => { pointer.inside = false; });
+  dom.addEventListener("pointerdown", (e) => {
+    pointer.down = { x: e.clientX, y: e.clientY };
+    pointer.moved = false;
+    setNDC(e.clientX, e.clientY);
+  });
+  dom.addEventListener("pointerup", (e) => {
+    const wasClick = pointer.down && !pointer.moved;
+    pointer.down = null;
+    if (!wasClick) return;
+    setNDC(e.clientX, e.clientY);
+    const key = pickAt();
+    if (key) {
+      select(key);
+    } else {
+      // клик по пустому месту: снять выделение и закрыть панель
+      closePanel();
+      deselect();
+    }
+  });
+  dom.addEventListener("pointercancel", () => { pointer.down = null; });
+
+  /* ---------- Кнопки управления ---------- */
+  const btnPause = document.getElementById("btnPause");
+  const speedInput = document.getElementById("speed");
+  const speedOut = document.getElementById("speedOut");
+  const btnOrbits = document.getElementById("btnOrbits");
+  const btnLabels = document.getElementById("btnLabels");
+  const btnReset = document.getElementById("btnReset");
+  const btnFull = document.getElementById("btnFull");
+  const btnHelp = document.getElementById("btnHelp");
+  const helpEl = document.getElementById("help");
+  const closeHelpBtn = document.getElementById("closeHelp");
+  const closePanelBtn = document.getElementById("closePanel");
+  const labelsLayer = document.getElementById("labels");
+
+  function setPaused(v) {
+    state.paused = v;
+    btnPause.textContent = v ? "▶" : "❚❚";
+    btnPause.setAttribute("aria-pressed", String(v));
+    btnPause.setAttribute("aria-label", v ? "Продолжить анимацию" : "Пауза анимации");
+  }
+  btnPause.addEventListener("click", () => setPaused(!state.paused));
+
+  speedInput.addEventListener("input", () => {
+    state.speed = parseFloat(speedInput.value);
+    speedOut.textContent = "x" + state.speed.toFixed(1);
+  });
+
+  btnOrbits.addEventListener("click", () => {
+    state.orbits = !state.orbits;
+    orbitsGroup.visible = state.orbits;
+    btnOrbits.setAttribute("aria-pressed", String(state.orbits));
+  });
+
+  btnLabels.addEventListener("click", () => {
+    state.labels = !state.labels;
+    labelsLayer.classList.toggle("hidden-layer", !state.labels);
+    btnLabels.setAttribute("aria-pressed", String(state.labels));
+  });
+
+  btnReset.addEventListener("click", resetCamera);
+
+  if (!document.fullscreenEnabled) {
+    btnFull.hidden = true;
+  }
+  btnFull.addEventListener("click", () => {
+    if (!document.fullscreenElement) {
+      const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+      if (p && p.catch) p.catch(() => {});
+    } else {
+      const p = document.exitFullscreen && document.exitFullscreen();
+      if (p && p.catch) p.catch(() => {});
+    }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    const on = !!document.fullscreenElement;
+    btnFull.setAttribute("aria-pressed", String(on));
+    btnFull.setAttribute("aria-label", on ? "Выйти из полноэкранного режима" : "Полноэкранный режим");
+    btnFull.textContent = on ? "⤡" : "⛶";
+  });
+
+  function openHelp() {
+    helpEl.hidden = false;
+    btnHelp.setAttribute("aria-expanded", "true");
+    closeHelpBtn.focus();
+  }
+  function closeHelp() {
+    helpEl.hidden = true;
+    btnHelp.setAttribute("aria-expanded", "false");
+    btnHelp.focus();
+  }
+  btnHelp.addEventListener("click", openHelp);
+  closeHelpBtn.addEventListener("click", closeHelp);
+  helpEl.addEventListener("click", (e) => { if (e.target === helpEl) closeHelp(); });
+
+  closePanelBtn.addEventListener("click", () => {
+    closePanel();
+    deselect();
+  });
+
+  /* ---------- Клавиатура ---------- */
+  document.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) || "";
+    const isControl = tag === "BUTTON" || tag === "A" || tag === "INPUT";
+
+    if (e.key === "Escape") {
+      if (!helpEl.hidden) {
+        closeHelp();
+      } else if (panel.classList.contains("open")) {
+        closePanel();
+        deselect();
+      }
+      return;
+    }
+    if (e.key === " " || e.code === "Space") {
+      if (isControl) return; // нативная активация кнопки/слайдера
+      e.preventDefault();
+      setPaused(!state.paused);
+      return;
+    }
+    if ((e.key === "r" || e.key === "R") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (tag === "INPUT") return;
+      resetCamera();
+    }
+  });
+
+  /* ---------- Подписи: проекция ---------- */
+  const tmpV = new THREE.Vector3();
+  function updateLabels() {
+    const w = window.innerWidth, h = window.innerHeight;
+    for (const b of bodies) {
+      const lbl = b.label;
+      if (!lbl) continue;
+      b.mesh.getWorldPosition(tmpV);
+      const toObj = tmpV.clone().sub(camera.position);
+      const front = toObj.dot(camera.getWorldDirection(new THREE.Vector3())) > 0;
+      tmpV.project(camera);
+      if (!front || tmpV.z > 1 || tmpV.z < -1) {
+        lbl.style.opacity = "0";
+        continue;
+      }
+      const x = (tmpV.x * 0.5 + 0.5) * w;
+      const y = (-tmpV.y * 0.5 + 0.5) * h;
+      const yOff = Math.max(0, (b.size * (1 + 0.12 * b.hover)) * 0) + 16;
+      lbl.style.transform = `translate(${x.toFixed(1)}px, ${(y - yOff).toFixed(1)}px) translate(-50%, -100%)`;
+      lbl.style.opacity = "1";
+      lbl.classList.toggle("active", b.key === selectedKey || b.hover > 0.5);
+    }
+  }
+
+  /* ---------- Цикл анимации ---------- */
+  const clock = new THREE.Clock();
+  const tmpGoal = new THREE.Vector3();
+  const tmpEnd = new THREE.Vector3();
+  let firstFrame = true;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, clock.getDelta());
+    const speed = state.paused ? 0 : state.speed;
+    const step = dt * speed;
+
+    // Вращение и орбиты
+    for (const b of bodies) {
+      if (b.orbit) b.orbit.rotation.y += b.omega * step;
+      b.mesh.rotation.y += b.spin * step;
+
+      // Ховер: плавное увеличение и свечение
+      const isActive = (hovered === b.key) || (selectedKey === b.key);
+      const target = isActive ? 1 : 0;
+      b.hover += (target - b.hover) * Math.min(1, dt * 10);
+      b.mesh.scale.setScalar(b.size * (1 + 0.12 * b.hover));
+      if (b.mat) {
+        b.mat.emissive.copy(hiddenEmissive).multiplyScalar(b.hover * 0.5);
+      }
+    }
+
+    // Наведение курсора
+    if (!dragging()) {
+      const k = pickAt();
+      if (k !== hovered) hovered = k;
+      renderer.domElement.style.cursor = hovered ? "pointer" : "grab";
+    }
+
+    // Камера: плавный переход и следование за объектом
+    if (tween.active) {
+      const p = Math.min(1, (performance.now() - tween.t0) / tween.dur);
+      const e = easeInOutCubic(p);
+      if (tween.obj) tween.obj.mesh.getWorldPosition(tmpGoal); else tmpGoal.copy(HOME_TARGET);
+      tmpEnd.copy(tmpGoal).add(tween.offset);
+      controls.target.lerpVectors(tween.startTarget, tmpGoal, e);
+      camera.position.lerpVectors(tween.startPos, tmpEnd, e);
+      if (p >= 1) {
+        tween.active = false;
+        follow = tween.obj;
+      }
+    } else if (follow) {
+      follow.mesh.getWorldPosition(tmpGoal);
+      const delta = tmpGoal.clone().sub(controls.target);
+      camera.position.add(delta);
+      controls.target.copy(tmpGoal);
+    }
+
+    controls.update();
+
+    // Солнечная корона слегка пульсирует
+    const pulse = 1 + Math.sin(performance.now() * 0.0012) * 0.03;
+    coronaInner.scale.setScalar(SUN_SIZE * 3.2 * pulse);
+
+    renderer.render(scene, camera);
+    updateLabels();
+
+    if (firstFrame) {
+      firstFrame = false;
+      const loader = document.getElementById("loader");
+      loader.classList.add("done");
+      setTimeout(() => { loader.hidden = true; loader.style.display = "none"; }, 700);
+    }
+  }
+
+  function dragging() { return !!pointer.down && pointer.moved; }
+
+  /* ---------- Ресайз ---------- */
+  window.addEventListener("resize", () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+
+  /* ---------- Старт ---------- */
+  orbitsGroup.visible = state.orbits;
+  setPaused(false);
+  animate();
+}
+</script>
+</body>
+</html>

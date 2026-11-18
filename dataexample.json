@@ -2,6 +2,8 @@
   "title": "",
   "description": "",
   "prompt": "",
+  "difficulty": 1,
+  "releaseDate": null,
   "models": {
     "alice": {
       "fullModel": "Алиса AI (Expert)",

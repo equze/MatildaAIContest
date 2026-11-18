@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050711">
+  <title>Solar System 3D Explorer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050711;
+      --panel: rgba(10, 15, 29, .90);
+      --line: rgba(157, 177, 246, .16);
+      --text: #edf1ff;
+      --muted: #8795b2;
+      --accent: #9bb2ff;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); }
+    body { position: relative; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input, a { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #b9c9ff; outline-offset: 3px; }
+
+    #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; touch-action: none; }
+    .backdrop {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background: radial-gradient(ellipse at 49% 48%, rgba(39, 55, 111, .20), transparent 54%),
+                  radial-gradient(ellipse at 15% 12%, rgba(50, 62, 124, .12), transparent 42%),
+                  linear-gradient(180deg, #080b19, #040610);
+    }
+    .grain {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .09;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+    }
+
+    .labels-layer { position: fixed; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+    .planet-label {
+      position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); white-space: nowrap;
+      padding: 5px 9px; border: 1px solid rgba(170, 190, 255, .13); border-radius: 7px;
+      background: rgba(7, 11, 24, .58); color: rgba(225, 233, 255, .88);
+      font-size: 10px; font-weight: 750; letter-spacing: .035em; text-shadow: 0 2px 8px #000;
+      backdrop-filter: blur(7px); transition: color .18s, border-color .18s, background .18s;
+      will-change: left, top;
+    }
+    .planet-label.active { color: #fff; border-color: rgba(165, 190, 255, .72); background: rgba(48, 65, 115, .76); }
+
+    .topbar {
+      position: fixed; z-index: 10; inset: 0 0 auto; height: 76px; padding: 16px 22px;
+      display: flex; align-items: center; justify-content: space-between; pointer-events: none;
+    }
+    .topbar > * { pointer-events: auto; }
+    .back-button {
+      display: inline-flex; align-items: center; gap: 9px; padding: 10px 14px;
+      color: #e0e8ff; text-decoration: none; font-size: 12px; font-weight: 750;
+      border: 1px solid var(--line); border-radius: 10px; background: rgba(12, 17, 34, .76);
+      backdrop-filter: blur(14px); transition: .2s ease;
+    }
+    .back-button:hover { transform: translateX(-2px); background: rgba(41, 55, 94, .82); border-color: rgba(163, 185, 255, .42); }
+    .brand { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; }
+    .brand-title { color: #edf1ff; font-size: 14px; font-weight: 850; letter-spacing: .15em; text-transform: uppercase; white-space: nowrap; }
+    .brand-subtitle { margin-top: 4px; color: #7d8aa8; font-size: 9px; font-weight: 650; letter-spacing: .22em; text-transform: uppercase; }
+    .scene-hint { display: flex; align-items: center; gap: 8px; color: #8997b5; font-size: 10px; font-weight: 650; }
+    .scene-hint::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #8ba8ff; box-shadow: 0 0 12px #7898ff; }
+
+    .control-dock {
+      position: fixed; z-index: 10; left: 22px; bottom: 21px; width: 292px; padding: 15px;
+      border: 1px solid var(--line); border-radius: 15px; background: var(--panel);
+      backdrop-filter: blur(19px); box-shadow: 0 16px 54px rgba(0,0,0,.30);
+    }
+    .dock-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 13px; color: #aab8d8; font-size: 10px; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
+    .live { display: flex; align-items: center; gap: 6px; color: #8d9ab6; font-size: 9px; letter-spacing: .06em; }
+    .live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #70dba5; box-shadow: 0 0 9px rgba(112,219,165,.7); }
+    .speed-row { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+    .speed-label { color: #b1bdd5; font-size: 11px; font-weight: 650; white-space: nowrap; }
+    .speed-slider { flex: 1; min-width: 35px; height: 4px; appearance: none; border-radius: 10px; background: linear-gradient(90deg, #809bfa, #455779); cursor: pointer; }
+    .speed-slider::-webkit-slider-thumb { appearance: none; width: 13px; height: 13px; border: 2px solid #7089df; border-radius: 50%; background: #c7d4ff; box-shadow: 0 0 12px rgba(140,168,255,.5); }
+    .speed-slider::-moz-range-thumb { width: 10px; height: 10px; border: 2px solid #7089df; border-radius: 50%; background: #c7d4ff; box-shadow: 0 0 12px rgba(140,168,255,.5); }
+    .speed-value { min-width: 38px; color: #cbd7ff; text-align: right; font-size: 11px; font-weight: 850; font-variant-numeric: tabular-nums; }
+    .dock-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+    .control-button {
+      min-height: 37px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      border: 1px solid rgba(151,171,238,.13); border-radius: 8px; background: rgba(94,111,161,.09);
+      color: #aebbd7; cursor: pointer; font-size: 9px; font-weight: 750; text-align: center; transition: .18s ease;
+    }
+    .control-button:hover { color: #fff; border-color: rgba(150,178,255,.4); background: rgba(115,140,215,.2); }
+    .control-button.active { color: #d0dcff; border-color: rgba(142,167,255,.35); background: rgba(110,137,222,.20); }
+    .control-button .symbol { font-size: 15px; line-height: 1; font-weight: 550; }
+
+    .info-panel {
+      position: fixed; z-index: 12; top: 91px; right: 22px; width: 340px; max-height: calc(100vh - 115px);
+      display: flex; flex-direction: column; overflow: hidden;
+      border: 1px solid rgba(151,174,255,.20); border-radius: 17px; background: rgba(10,15,29,.93);
+      backdrop-filter: blur(22px); box-shadow: 0 20px 65px rgba(0,0,0,.39);
+      opacity: 0; visibility: hidden; transform: translateX(18px);
+      transition: opacity .24s ease, transform .24s ease, visibility .24s;
+    }
+    .info-panel.visible { opacity: 1; visibility: visible; transform: translateX(0); }
+    .panel-top { position: relative; padding: 22px 22px 18px; border-bottom: 1px solid rgba(149,169,222,.11); }
+    .panel-eyebrow { margin-bottom: 8px; color: #899bc5; font-size: 9px; font-weight: 850; letter-spacing: .17em; text-transform: uppercase; }
+    .panel-title { margin: 0; padding-right: 33px; color: #f1f4ff; font-size: 25px; line-height: 1.2; font-weight: 850; letter-spacing: -.045em; }
+    .panel-type { display: inline-flex; margin-top: 10px; padding: 5px 9px; border: 1px solid rgba(147,170,245,.17); border-radius: 6px; background: rgba(109,132,202,.1); color: #bdcaf0; font-size: 10px; font-weight: 750; }
+    .close-button {
+      position: absolute; top: 16px; right: 16px; width: 31px; height: 31px; display: grid; place-items: center;
+      border: 1px solid rgba(155,174,227,.16); border-radius: 8px; background: rgba(115,132,178,.09);
+      color: #bdc8df; cursor: pointer; font-size: 19px; transition: .18s;
+    }
+    .close-button:hover { color: #fff; background: rgba(129,146,204,.23); }
+    .panel-content { padding: 16px 22px 20px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(143,162,218,.35) transparent; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+    .stat-item { min-height: 67px; padding: 10px 11px; border: 1px solid rgba(140,159,216,.11); border-radius: 9px; background: rgba(112,131,184,.06); }
+    .stat-label { margin-bottom: 7px; color: #8391ae; font-size: 9px; font-weight: 700; }
+    .stat-value { color: #e5ebff; font-size: 11px; font-weight: 800; line-height: 1.4; overflow-wrap: anywhere; }
+    .fact-box { margin-top: 14px; padding: 13px; border: 1px solid rgba(139,164,255,.17); border-radius: 10px; background: linear-gradient(135deg, rgba(97,122,201,.13), rgba(48,67,116,.07)); }
+    .fact-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; color: #c1ceff; font-size: 10px; font-weight: 850; letter-spacing: .10em; text-transform: uppercase; }
+    .fact-text { margin: 0; color: #bac5dc; font-size: 11px; line-height: 1.7; }
+    .panel-footer { margin-top: 13px; padding-top: 12px; border-top: 1px solid rgba(149,169,222,.10); color: #7785a1; font-size: 9px; line-height: 1.6; }
+
+    .help-overlay {
+      position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 18px;
+      background: rgba(2,4,12,.72); backdrop-filter: blur(9px); opacity: 0; visibility: hidden; transition: .2s;
+    }
+    .help-overlay.visible { opacity: 1; visibility: visible; }
+    .help-card { position: relative; width: min(430px,100%); padding: 25px; border: 1px solid rgba(149,176,255,.2); border-radius: 17px; background: rgba(13,19,37,.98); box-shadow: 0 25px 90px rgba(0,0,0,.48); transform: translateY(10px); transition: transform .2s; }
+    .help-overlay.visible .help-card { transform: translateY(0); }
+    .help-title { margin: 0 0 7px; font-size: 21px; font-weight: 850; }
+    .help-subtitle { margin: 0 0 19px; color: #8996b2; font-size: 11px; line-height: 1.6; }
+    .help-section-title { margin: 18px 0 9px; color: #8fa1d2; font-size: 9px; font-weight: 850; letter-spacing: .14em; text-transform: uppercase; }
+    .help-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(144,163,218,.08); color: #cbd4e9; font-size: 11px; }
+    .help-row:last-child { border-bottom: 0; }
+    kbd { padding: 5px 9px; border: 1px solid rgba(153,173,231,.2); border-radius: 6px; background: rgba(116,139,207,.12); color: #e1e9ff; font-size: 10px; font-weight: 850; white-space: nowrap; }
+    .help-close { top: 17px; right: 17px; }
+
+    .loading-screen { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; background: #050711; transition: opacity .45s, visibility .45s; }
+    .loading-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    .loading-orbit { position: relative; width: 48px; height: 48px; border: 1px solid rgba(147,169,255,.22); border-radius: 50%; animation: spin 2.5s linear infinite; }
+    .loading-orbit::before { content: ""; position: absolute; top: -4px; left: 18px; width: 8px; height: 8px; border-radius: 50%; background: #a9bdff; box-shadow: 0 0 15px #829fff; }
+    .loading-orbit::after { content: ""; position: absolute; inset: 9px; border: 1px solid rgba(147,169,255,.17); border-radius: 50%; }
+    .loading-text { color: #afbddf; font-size: 10px; font-weight: 800; letter-spacing: .18em; text-align: center; text-transform: uppercase; }
+    .loading-error { max-width: 450px; color: #ffbebe; font-size: 12px; text-align: center; line-height: 1.7; }
+    .loading-retry { margin-top: 5px; padding: 9px 13px; border: 1px solid rgba(155,180,255,.3); border-radius: 8px; background: rgba(112,137,222,.15); color: #e1e9ff; cursor: pointer; font-size: 11px; font-weight: 750; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 700px) {
+      .topbar { height: 62px; padding: 11px 12px; }
+      .back-button { padding: 9px 11px; font-size: 11px; }
+      .brand { top: 14px; }
+      .brand-title { font-size: 10px; letter-spacing: .11em; }
+      .brand-subtitle { font-size: 7px; letter-spacing: .13em; }
+      .scene-hint { display: none; }
+      .control-dock { top: 68px; right: 10px; bottom: auto; left: auto; width: 174px; padding: 11px; border-radius: 12px; }
+      .dock-heading { margin-bottom: 9px; font-size: 9px; }
+      .speed-row { flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+      .speed-label, .speed-value { font-size: 10px; }
+      .speed-slider { order: 3; flex-basis: 100%; }
+      .dock-actions { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; }
+      .control-button { min-height: 34px; padding: 5px 3px; font-size: 8px; }
+      .control-button .symbol { font-size: 13px; }
+      .info-panel { top: auto; right: 10px; bottom: 10px; left: 10px; width: auto; max-height: min(43vh, 390px); border-radius: 14px; transform: translateY(18px); }
+      .info-panel.visible { transform: translateY(0); }
+      .panel-top { padding: 12px 15px 10px; }
+      .panel-eyebrow { margin-bottom: 5px; font-size: 8px; }
+      .panel-title { font-size: 19px; }
+      .panel-type { margin-top: 6px; padding: 4px 7px; font-size: 9px; }
+      .close-button { top: 10px; right: 11px; width: 28px; height: 28px; }
+      .panel-content { padding: 10px 14px 13px; }
+      .stats-grid { gap: 6px; }
+      .stat-item { min-height: 52px; padding: 7px 8px; }
+      .stat-label { margin-bottom: 4px; font-size: 8px; }
+      .stat-value { font-size: 10px; }
+      .fact-box { margin-top: 9px; padding: 9px; }
+      .fact-heading { margin-bottom: 5px; font-size: 9px; }
+      .fact-text { font-size: 10px; }
+      .panel-footer { margin-top: 8px; padding-top: 8px; font-size: 8px; }
+      .planet-label { padding: 4px 6px; font-size: 9px; }
+    }
+    @media (max-width: 380px) {
+      .brand { left: 56%; }
+      .control-dock { right: 8px; width: 155px; }
+      .info-panel { max-height: 45vh; }
+    }
+    @media (max-height: 650px) and (min-width: 701px) {
+      .control-dock { bottom: 10px; padding: 10px; }
+      .info-panel { top: 78px; max-height: calc(100vh - 90px); }
+      .panel-top { padding-top: 14px; padding-bottom: 11px; }
+      .panel-content { padding-top: 10px; padding-bottom: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  </style>
+
+  <!-- Three.js загружается с Unpkg вместо jsDelivr. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <canvas id="scene" aria-label="Интерактивная трёхмерная модель Солнечной системы"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="labels-layer" id="labelsLayer" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="back-button" href="../../index.html" aria-label="Назад на главную страницу">← <span>Назад</span></a>
+    <div class="brand" aria-label="Solar System 3D Explorer">
+      <div class="brand-title">Solar System Explorer</div>
+      <div class="brand-subtitle">Interactive 3D universe</div>
+    </div>
+    <div class="scene-hint">Выберите объект</div>
+  </header>
+
+  <section class="control-dock" aria-label="Управление сценой">
+    <div class="dock-heading"><span>Управление</span><span class="live">LIVE</span></div>
+    <div class="speed-row">
+      <label class="speed-label" for="speedSlider">Скорость</label>
+      <input id="speedSlider" class="speed-slider" type="range" min="0" max="5" step="0.1" value="1" aria-label="Скорость анимации от 0 до 5">
+      <span class="speed-value" id="speedValue">1.0×</span>
+    </div>
+    <div class="dock-actions">
+      <button id="pauseButton" class="control-button active" type="button" aria-label="Приостановить анимацию"><span class="symbol" aria-hidden="true">Ⅱ</span><span>Пауза</span></button>
+      <button id="orbitsButton" class="control-button active" type="button" aria-label="Скрыть орбиты" aria-pressed="true"><span class="symbol" aria-hidden="true">◯</span><span>Орбиты</span></button>
+      <button id="labelsButton" class="control-button active" type="button" aria-label="Скрыть подписи" aria-pressed="true"><span class="symbol" aria-hidden="true">Aa</span><span>Подписи</span></button>
+      <button id="resetButton" class="control-button" type="button" aria-label="Сбросить камеру"><span class="symbol" aria-hidden="true">↺</span><span>Сброс</span></button>
+      <button id="fullscreenButton" class="control-button" type="button" aria-label="Включить полноэкранный режим"><span class="symbol" aria-hidden="true">⛶</span><span>Экран</span></button>
+      <button id="helpButton" class="control-button" type="button" aria-label="Открыть справку"><span class="symbol" aria-hidden="true">?</span><span>Справка</span></button>
+    </div>
+  </section>
+
+  <aside class="info-panel" id="infoPanel" aria-labelledby="infoTitle" aria-hidden="true">
+    <div class="panel-top">
+      <div class="panel-eyebrow">Исследование объекта</div>
+      <h2 class="panel-title" id="infoTitle">Земля</h2>
+      <span class="panel-type" id="infoType">Планета</span>
+      <button id="closePanelButton" class="close-button" type="button" aria-label="Закрыть информационную панель">×</button>
+    </div>
+    <div class="panel-content" id="infoContent"></div>
+  </aside>
+
+  <div class="help-overlay" id="helpOverlay" role="dialog" aria-modal="true" aria-labelledby="helpTitle" aria-hidden="true">
+    <div class="help-card">
+      <button id="closeHelpButton" class="close-button help-close" type="button" aria-label="Закрыть справку">×</button>
+      <h2 class="help-title" id="helpTitle">Управление</h2>
+      <p class="help-subtitle">Исследуйте Солнечную систему, вращайте камеру и выбирайте небесные тела.</p>
+      <div class="help-section-title">Мышь и сенсорный экран</div>
+      <div class="help-row"><span>Вращение камеры</span><span>ЛКМ / 1 палец</span></div>
+      <div class="help-row"><span>Приближение / отдаление</span><span>Колесо / 2 пальца</span></div>
+      <div class="help-row"><span>Перемещение камеры</span><span>ПКМ / 2 пальца</span></div>
+      <div class="help-row"><span>Выбор объекта</span><span>Клик / касание</span></div>
+      <div class="help-section-title">Горячие клавиши</div>
+      <div class="help-row"><span>Пауза / продолжить</span><kbd>SPACE</kbd></div>
+      <div class="help-row"><span>Сброс камеры</span><kbd>R</kbd></div>
+      <div class="help-row"><span>Закрыть панель / справку</span><kbd>ESC</kbd></div>
+    </div>
+  </div>
+
+  <div class="loading-screen" id="loadingScreen" role="status" aria-live="polite">
+    <div class="loading-orbit" id="loadingSpinner"></div>
+    <div class="loading-text" id="loadingText">Инициализация космоса</div>
+  </div>
+
+  <script type="module">
+    const loadingScreen = document.getElementById('loadingScreen');
+    const loadingText = document.getElementById('loadingText');
+
+    try {
+      const THREE = await import('three');
+      const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+
+      const $ = (id) => document.getElementById(id);
+      const canvas = $('scene');
+      const labelsLayer = $('labelsLayer');
+      const infoPanel = $('infoPanel');
+      const infoTitle = $('infoTitle');
+      const infoType = $('infoType');
+      const infoContent = $('infoContent');
+      const helpOverlay = $('helpOverlay');
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x050711);
+      scene.fog = new THREE.FogExp2(0x050711, 0.00085);
+
+      const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 450);
+      const homeCamera = new THREE.Vector3(0, 73, 111);
+      const homeTarget = new THREE.Vector3(0, 0, 0);
+      camera.position.copy(homeCamera);
+
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.22;
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.055;
+      controls.enablePan = true;
+      controls.rotateSpeed = 0.65;
+      controls.zoomSpeed = 0.8;
+      controls.panSpeed = 0.65;
+      controls.minDistance = 5;
+      controls.maxDistance = 210;
+      controls.minPolarAngle = 0.035;
+      controls.maxPolarAngle = Math.PI * 0.49;
+      controls.target.copy(homeTarget);
+      controls.update();
+
+      // Освещение.
+      scene.add(new THREE.AmbientLight(0x8796d6, 0.48));
+      scene.add(new THREE.HemisphereLight(0xb5c6ff, 0x171a34, 0.34));
+      const sunlight = new THREE.PointLight(0xffd18a, 190, 230, 1.55);
+      sunlight.position.set(0, 0, 0);
+      scene.add(sunlight);
+      const fillLight = new THREE.DirectionalLight(0x8baaff, 0.22);
+      fillLight.position.set(-35, 45, -45);
+      scene.add(fillLight);
+
+      const planetData = [
+        { id:'sun', name:'Солнце', type:'Звезда', diameter:'≈ 1 392 700 км', distance:'0 км', period:'—', moons:'0', day:'≈ 25–35 суток', radius:3.8, fact:'Солнце содержит около 99,86% всей массы Солнечной системы. Энергия звезды возникает в результате термоядерного синтеза в её ядре.' },
+        { id:'mercury', name:'Меркурий', type:'Каменистая планета', diameter:'≈ 4 879 км', distance:'≈ 57,9 млн км', period:'≈ 88 суток', moons:'0', day:'≈ 58,6 земных суток', radius:.48, orbit:9.5, orbitSpeed:.82, rotationSpeed:.22, angle:.45, tilt:.04, seed:11, fact:'Меркурий — ближайшая к Солнцу планета. Несмотря на соседство со звездой, он не является самой горячей планетой.' },
+        { id:'venus', name:'Венера', type:'Каменистая планета', diameter:'≈ 12 104 км', distance:'≈ 108,2 млн км', period:'≈ 224,7 суток', moons:'0', day:'≈ 243 земных суток', radius:.78, orbit:14.5, orbitSpeed:.59, rotationSpeed:-.12, angle:2.4, tilt:.03, seed:22, fact:'Венера вращается вокруг своей оси в направлении, противоположном вращению большинства планет. Её плотная атмосфера создаёт мощный парниковый эффект.' },
+        { id:'earth', name:'Земля', type:'Каменистая планета', diameter:'≈ 12 742 км', distance:'≈ 149,6 млн км', period:'≈ 365,25 суток', moons:'1', day:'≈ 24 часа', radius:.84, orbit:20, orbitSpeed:.45, rotationSpeed:.8, angle:-.8, tilt:.12, seed:33, fact:'Земля — единственная известная на сегодняшний день планета с подтверждённым существованием жизни. Около 71% её поверхности покрыто водой.' },
+        { id:'mars', name:'Марс', type:'Каменистая планета', diameter:'≈ 6 779 км', distance:'≈ 227,9 млн км', period:'≈ 687 суток', moons:'2', day:'≈ 24,6 часа', radius:.61, orbit:25.5, orbitSpeed:.34, rotationSpeed:.75, angle:2.9, tilt:.16, seed:44, fact:'Марс известен как Красная планета. Его поверхность окрашена оксидами железа, а на нём находится Олимп — крупнейший известный вулкан Солнечной системы.' },
+        { id:'jupiter', name:'Юпитер', type:'Газовый гигант', diameter:'≈ 139 820 км', distance:'≈ 778,5 млн км', period:'≈ 4 333 суток', moons:'≈ 95', day:'≈ 9,9 часа', radius:2.15, orbit:34, orbitSpeed:.22, rotationSpeed:1.1, angle:1.1, tilt:.05, seed:55, fact:'Юпитер — крупнейшая планета Солнечной системы. Большое красное пятно — гигантский атмосферный вихрь, существующий на протяжении нескольких столетий.' },
+        { id:'saturn', name:'Сатурн', type:'Газовый гигант', diameter:'≈ 116 460 км', distance:'≈ 1 434 млн км', period:'≈ 10 759 суток', moons:'≈ 146', day:'≈ 10,7 часа', radius:1.9, orbit:43, orbitSpeed:.16, rotationSpeed:.95, angle:-2.35, tilt:.12, seed:66, fact:'Сатурн знаменит системой колец, состоящих преимущественно из частиц льда и камня. Его средняя плотность меньше плотности воды.' },
+        { id:'uranus', name:'Уран', type:'Ледяной гигант', diameter:'≈ 50 724 км', distance:'≈ 2 871 млн км', period:'≈ 30 687 суток', moons:'≈ 28', day:'≈ 17,2 часа', radius:1.34, orbit:52, orbitSpeed:.12, rotationSpeed:-.55, angle:.15, tilt:.96, seed:77, fact:'Ось вращения Урана наклонена почти на 98 градусов. Из-за этого планета словно вращается, лёжа на боку.' },
+        { id:'neptune', name:'Нептун', type:'Ледяной гигант', diameter:'≈ 49 244 км', distance:'≈ 4 495 млн км', period:'≈ 60 190 суток', moons:'≈ 16', day:'≈ 16,1 часа', radius:1.29, orbit:61, orbitSpeed:.09, rotationSpeed:.65, angle:-1.55, tilt:.08, seed:88, fact:'Нептун — самая удалённая от Солнца планета. В его атмосфере наблюдаются одни из самых быстрых ветров в Солнечной системе.' }
+      ];
+
+      const sphereGeometry = new THREE.SphereGeometry(1, 48, 32);
+      const clickableMeshes = [];
+      const entities = [];
+      const orbitLines = [];
+      const labelRecords = [];
+      const planetRecords = [];
+
+      function seededRandom(seed) {
+        let value = seed >>> 0;
+        return () => {
+          value = (value * 1664525 + 1013904223) >>> 0;
+          return value / 4294967296;
+        };
+      }
+
+      function makeTexture(kind, seed) {
+        const w = 1024, h = 512;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        const rnd = seededRandom(seed);
+        const palettes = {
+          mercury:['#777b80','#a3a4a2','#565960','#b7b4aa'],
+          venus:['#b98c57','#d8b47c','#ead0a4','#946c4b'],
+          earth:['#174b83','#286a9d','#4d9862','#8b9b55'],
+          mars:['#a84c32','#d36d42','#e28c59','#7f382b'],
+          jupiter:['#ad8065','#e2c3a0','#cfaa83','#875d4e'],
+          saturn:['#bba16f','#dfc99c','#98835e','#eee0b5'],
+          uranus:['#75c5cf','#a0dee0','#4faab8','#8cd2d9'],
+          neptune:['#184d9c','#2868c1','#3b86d0','#102e73']
+        };
+        const colors = palettes[kind];
+        ctx.fillStyle = colors[0]; ctx.fillRect(0,0,w,h);
+
+        if (['jupiter','saturn','uranus','neptune'].includes(kind)) {
+          for (let y=0; y<h; y+=7) {
+            const color = colors[Math.floor(rnd()*colors.length)];
+            const offset = rnd()*10-5;
+            ctx.beginPath(); ctx.moveTo(0,y+offset);
+            for (let x=0; x<=w; x+=28) ctx.lineTo(x,y+Math.sin(x*.018+y*.009)*3+offset);
+            ctx.lineTo(w,y+7+offset); ctx.lineTo(0,y+7+offset); ctx.closePath();
+            ctx.fillStyle=color; ctx.globalAlpha=.15+rnd()*.34; ctx.fill();
+          }
+          for (let i=0;i<100;i++) {
+            ctx.beginPath();
+            ctx.ellipse(rnd()*w,rnd()*h,25+rnd()*130,1+rnd()*4,0,0,Math.PI*2);
+            ctx.fillStyle=colors[Math.floor(rnd()*colors.length)]; ctx.globalAlpha=.10+rnd()*.16; ctx.fill();
+          }
+          ctx.globalAlpha=1;
+          if (kind==='jupiter') {
+            const g=ctx.createRadialGradient(730,265,3,730,265,58);
+            g.addColorStop(0,'#d88463'); g.addColorStop(.7,'#b95f4c'); g.addColorStop(1,'rgba(153,78,62,0)');
+            ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(730,265,64,28,-.12,0,Math.PI*2); ctx.fill();
+          }
+          if (kind==='neptune') {
+            ctx.fillStyle='rgba(8,22,74,.47)'; ctx.beginPath(); ctx.ellipse(320,170,82,23,-.16,0,Math.PI*2); ctx.fill();
+          }
+        }
+
+        if (kind==='earth') {
+          const land = [
+            [[90,125],[150,93],[209,105],[229,138],[198,169],[175,205],[143,202],[116,170]],
+            [[250,235],[285,219],[306,240],[299,281],[278,323],[259,284]],
+            [[440,115],[482,90],[541,100],[568,126],[553,154],[520,158],[501,184],[465,157]],
+            [[510,195],[542,190],[566,225],[550,282],[525,315],[506,267]],
+            [[640,100],[694,90],[725,122],[711,155],[672,152]],
+            [[745,238],[781,220],[815,245],[805,276],[773,287]]
+          ];
+          land.forEach((points,i)=>{
+            ctx.beginPath(); points.forEach(([x,y],n)=>n?ctx.lineTo(x,y):ctx.moveTo(x,y)); ctx.closePath();
+            ctx.fillStyle=i%2?'#648c50':'#468b59'; ctx.fill();
+          });
+          for (let i=0;i<90;i++) {
+            ctx.beginPath(); ctx.ellipse(rnd()*w,rnd()*h,12+rnd()*28,2+rnd()*6,rnd()*Math.PI,0,Math.PI*2);
+            ctx.fillStyle='rgba(231,240,245,.25)'; ctx.fill();
+          }
+        }
+
+        if (kind==='mercury'||kind==='mars') {
+          const count=kind==='mercury'?230:140;
+          for (let i=0;i<count;i++) {
+            const x=rnd()*w,y=rnd()*h,r=2+rnd()*(kind==='mercury'?11:8);
+            ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle='rgba(30,30,32,.14)'; ctx.fill();
+            ctx.beginPath(); ctx.arc(x-r*.12,y-r*.12,r*.68,0,Math.PI*2); ctx.strokeStyle='rgba(238,225,204,.17)'; ctx.lineWidth=1.5; ctx.stroke();
+          }
+        }
+        for (let i=0;i<1800;i++) {
+          ctx.fillStyle=rnd()>.5?'rgba(255,255,255,.07)':'rgba(0,0,0,.065)';
+          ctx.fillRect(rnd()*w,rnd()*h,1+rnd()*2,1+rnd()*2);
+        }
+        const texture=new THREE.CanvasTexture(c);
+        texture.colorSpace=THREE.SRGBColorSpace;
+        texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),4);
+        return texture;
+      }
+
+      // Солнце и мягкое свечение.
+      const sunData=planetData[0];
+      const sunMaterial=new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xff9b28, emissiveIntensity:2.35, roughness:1 });
+      const sun=new THREE.Mesh(sphereGeometry,sunMaterial);
+      sun.scale.setScalar(sunData.radius);
+      const sunEntity={...sunData,object:sun,labelOffset:6.7};
+      sun.userData.entity=sunEntity;
+      scene.add(sun); clickableMeshes.push(sun);
+      const sunAura=new THREE.Mesh(sphereGeometry,new THREE.MeshBasicMaterial({color:0xff8b27,transparent:true,opacity:.075,side:THREE.BackSide,depthWrite:false}));
+      sunAura.scale.setScalar(1.32); sun.add(sunAura);
+
+      const glowCanvas=document.createElement('canvas'); glowCanvas.width=256; glowCanvas.height=256;
+      const glowCtx=glowCanvas.getContext('2d');
+      const glow=glowCtx.createRadialGradient(128,128,7,128,128,128);
+      glow.addColorStop(0,'rgba(255,192,92,.52)'); glow.addColorStop(.25,'rgba(255,157,60,.25)'); glow.addColorStop(.62,'rgba(255,112,38,.07)'); glow.addColorStop(1,'rgba(255,100,30,0)');
+      glowCtx.fillStyle=glow; glowCtx.fillRect(0,0,256,256);
+      const sunSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(glowCanvas),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.85}));
+      sunSprite.scale.set(24,24,1); sun.add(sunSprite);
+      entities.push(sunEntity);
+
+      function addOrbit(radius) {
+        const points=[];
+        for(let i=0;i<240;i++) {
+          const a=i/240*Math.PI*2;
+          points.push(new THREE.Vector3(Math.cos(a)*radius,0,Math.sin(a)*radius));
+        }
+        const geometry=new THREE.BufferGeometry().setFromPoints(points);
+        const line=new THREE.LineLoop(geometry,new THREE.LineBasicMaterial({color:0x8295d5,transparent:true,opacity:.25,depthWrite:false}));
+        scene.add(line); orbitLines.push(line);
+      }
+
+      // Планеты, атмосферы и кольца.
+      for (const data of planetData.slice(1)) {
+        addOrbit(data.orbit);
+        const group=new THREE.Group();
+        group.position.set(Math.cos(data.angle)*data.orbit,0,Math.sin(data.angle)*data.orbit);
+        group.rotation.z=data.tilt;
+        scene.add(group);
+
+        const material=new THREE.MeshStandardMaterial({map:makeTexture(data.id,data.seed),roughness:.88,metalness:.015});
+        const mesh=new THREE.Mesh(sphereGeometry,material);
+        mesh.scale.setScalar(data.radius);
+        group.add(mesh);
+
+        if(data.id==='earth'||data.id==='venus') {
+          const atmosphere=new THREE.Mesh(sphereGeometry,new THREE.MeshBasicMaterial({
+            color:data.id==='earth'?0x4799ff:0xe9ad73,transparent:true,
+            opacity:data.id==='earth'?.12:.06,side:THREE.BackSide,depthWrite:false
+          }));
+          atmosphere.scale.setScalar(1.09); group.add(atmosphere);
+        }
+
+        if(data.id==='saturn'||data.id==='uranus') {
+          const saturn=data.id==='saturn';
+          const ring=new THREE.Mesh(
+            new THREE.RingGeometry(data.radius*(saturn?1.24:1.55),data.radius*(saturn?2.28:1.95),100),
+            new THREE.MeshStandardMaterial({color:saturn?0xc8b38c:0x91b8c3,roughness:1,side:THREE.DoubleSide,transparent:true,opacity:saturn?.76:.36,depthWrite:false})
+          );
+          ring.rotation.x=Math.PI/2; ring.rotation.z=saturn?.13:.25; group.add(ring);
+          if(saturn) {
+            const inner=new THREE.Mesh(new THREE.RingGeometry(data.radius*1.08,data.radius*1.20,100),new THREE.MeshStandardMaterial({color:0xe1cfa7,side:THREE.DoubleSide,transparent:true,opacity:.55,depthWrite:false}));
+            inner.rotation.x=Math.PI/2; inner.rotation.z=.13; group.add(inner);
+          }
+        }
+
+        const entity={...data,object:group,mesh,labelOffset:data.radius+(data.id==='saturn'?2.5:1.45)};
+        mesh.userData.entity=entity;
+        clickableMeshes.push(mesh);
+        entities.push(entity);
+        planetRecords.push(entity);
+      }
+
+      // Звёзды на заднем плане.
+      function createStars() {
+        const random=seededRandom(90210), count=2800, positions=new Float32Array(count*3);
+        for(let i=0;i<count;i++) {
+          const u=random()*2-1, a=random()*Math.PI*2, r=135+random()*100, planar=Math.sqrt(1-u*u);
+          positions[i*3]=r*planar*Math.cos(a);
+          positions[i*3+1]=r*u;
+          positions[i*3+2]=r*planar*Math.sin(a);
+        }
+        const geometry=new THREE.BufferGeometry(); geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+        const points=new THREE.Points(geometry,new THREE.PointsMaterial({color:0xcbd8ff,size:.62,sizeAttenuation:true,transparent:true,opacity:.78,depthWrite:false}));
+        scene.add(points); return points;
+      }
+      const stars=createStars();
+
+      // DOM-подписи объектов.
+      for(const entity of entities) {
+        const element=document.createElement('div');
+        element.className='planet-label'; element.textContent=entity.name;
+        labelsLayer.appendChild(element); labelRecords.push({element,entity});
+      }
+
+      let labelsVisible=true, orbitsVisible=true, paused=false, speed=1, selected=null, cameraTween=null;
+      // После выбора камера продолжает сопровождать движущееся небесное тело.
+      let followingEntity=null;
+      let lastFollowPosition=null;
+      const raycaster=new THREE.Raycaster();
+      const pointer=new THREE.Vector2();
+      const projected=new THREE.Vector3();
+
+      function setPointer(event) {
+        const rect=canvas.getBoundingClientRect();
+        pointer.x=((event.clientX-rect.left)/rect.width)*2-1;
+        pointer.y=-((event.clientY-rect.top)/rect.height)*2+1;
+      }
+      function hitTest(event) {
+        setPointer(event); raycaster.setFromCamera(pointer,camera);
+        const hits=raycaster.intersectObjects(clickableMeshes,false);
+        return hits.length?hits[0].object.userData.entity:null;
+      }
+
+      function renderInfo(entity) {
+        infoTitle.textContent=entity.name;
+        infoType.textContent=entity.type;
+        const stats=[
+          ['Диаметр',entity.diameter],
+          ['Расстояние от Солнца',entity.distance],
+          ['Период обращения',entity.period],
+          ['Количество лун',entity.moons],
+          ['Продолжительность суток',entity.day]
+        ];
+        infoContent.replaceChildren();
+        const grid=document.createElement('div'); grid.className='stats-grid';
+        for(const [label,value] of stats) {
+          const item=document.createElement('div'); item.className='stat-item';
+          const name=document.createElement('div'); name.className='stat-label'; name.textContent=label;
+          const val=document.createElement('div'); val.className='stat-value'; val.textContent=value;
+          item.append(name,val); grid.append(item);
+        }
+        const fact=document.createElement('div'); fact.className='fact-box';
+        const heading=document.createElement('div'); heading.className='fact-heading'; heading.textContent='✦  Интересный факт';
+        const text=document.createElement('p'); text.className='fact-text'; text.textContent=entity.fact;
+        fact.append(heading,text);
+        const footer=document.createElement('div'); footer.className='panel-footer';
+        footer.textContent='Данные приблизительные. Размеры объектов и расстояния между ними в модели художественно адаптированы.';
+        infoContent.append(grid,fact,footer);
+      }
+
+      function focusOn(entity) {
+        // Целевая точка вычисляется заново в каждом кадре: планета продолжает
+        // двигаться по орбите, и камера сопровождает её во время приближения.
+        const object=entity?.object;
+        if (!object || typeof object.getWorldPosition!=='function') {
+          console.error('Не удалось сфокусировать камеру: у объекта отсутствует 3D-модель.', entity);
+          return;
+        }
+
+        const target=object.getWorldPosition(new THREE.Vector3());
+        let direction=camera.position.clone().sub(controls.target).normalize();
+        if(direction.lengthSq()<.001) direction.set(0,.65,1).normalize();
+        const distance=entity.id==='sun'?13:Math.max(8,entity.radius*5.7+4);
+
+        followingEntity=entity;
+        lastFollowPosition=target.clone();
+        cameraTween={
+          start:performance.now(),
+          duration:950,
+          fromPosition:camera.position.clone(),
+          fromTarget:controls.target.clone(),
+          cameraOffset:direction.multiplyScalar(distance),
+          entity
+        };
+      }
+      function updateSelectedLabels() {
+        for(const {element,entity} of labelRecords) element.classList.toggle('active',!!selected&&entity.id===selected.id);
+      }
+      function selectEntity(entity) {
+        if(!entity) return;
+        selected=entity; renderInfo(entity); focusOn(entity);
+        infoPanel.classList.add('visible'); infoPanel.setAttribute('aria-hidden','false'); updateSelectedLabels();
+      }
+      function closeInfo() {
+        selected=null;
+        followingEntity=null;
+        lastFollowPosition=null;
+        cameraTween=null;
+        infoPanel.classList.remove('visible');
+        infoPanel.setAttribute('aria-hidden','true');
+        updateSelectedLabels();
+      }
+      function resetCamera() {
+        closeInfo();
+        cameraTween={
+          start:performance.now(),duration:850,
+          fromPosition:camera.position.clone(),toPosition:homeCamera.clone(),
+          fromTarget:controls.target.clone(),toTarget:homeTarget.clone(),
+          entity:null
+        };
+      }
+
+      // Выбор объекта. Небольшое перемещение указателя считается вращением, а не кликом.
+      let pointerDown=null;
+      canvas.addEventListener('pointerdown',event=>{
+        if(event.button!==0) return;
+        pointerDown={x:event.clientX,y:event.clientY,pointerId:event.pointerId};
+      });
+      canvas.addEventListener('pointerup',event=>{
+        if(!pointerDown||event.button!==0) return;
+        const moved=Math.hypot(event.clientX-pointerDown.x,event.clientY-pointerDown.y);
+        pointerDown=null;
+        if(moved>7) return;
+        const entity=hitTest(event);
+        if(entity) selectEntity(entity); else closeInfo();
+      });
+      canvas.addEventListener('pointercancel',()=>{pointerDown=null;});
+      canvas.addEventListener('pointermove',event=>{
+        if(event.pointerType==='touch') return;
+        const entity=hitTest(event);
+        canvas.style.cursor=entity?'pointer':'grab';
+      });
+      canvas.addEventListener('pointerleave',()=>{canvas.style.cursor='grab';});
+
+      // Кнопки интерфейса.
+      const pauseButton=$('pauseButton');
+      function updatePauseButton() {
+        pauseButton.innerHTML=paused?'<span class="symbol" aria-hidden="true">▶</span><span>Продолжить</span>':'<span class="symbol" aria-hidden="true">Ⅱ</span><span>Пауза</span>';
+        pauseButton.classList.toggle('active',paused);
+        pauseButton.setAttribute('aria-label',paused?'Продолжить анимацию':'Приостановить анимацию');
+      }
+      function togglePause() { paused=!paused; updatePauseButton(); }
+      pauseButton.addEventListener('click',togglePause);
+      $('speedSlider').addEventListener('input',event=>{
+        speed=Number(event.currentTarget.value); $('speedValue').textContent=`${speed.toFixed(1)}×`;
+      });
+      $('orbitsButton').addEventListener('click',event=>{
+        orbitsVisible=!orbitsVisible; orbitLines.forEach(line=>line.visible=orbitsVisible);
+        const button=event.currentTarget; button.classList.toggle('active',orbitsVisible);
+        button.setAttribute('aria-pressed',String(orbitsVisible)); button.setAttribute('aria-label',orbitsVisible?'Скрыть орбиты':'Показать орбиты');
+      });
+      $('labelsButton').addEventListener('click',event=>{
+        labelsVisible=!labelsVisible; labelsLayer.style.display=labelsVisible?'block':'none';
+        const button=event.currentTarget; button.classList.toggle('active',labelsVisible);
+        button.setAttribute('aria-pressed',String(labelsVisible)); button.setAttribute('aria-label',labelsVisible?'Скрыть подписи':'Показать подписи');
+      });
+      $('resetButton').addEventListener('click',resetCamera);
+      $('fullscreenButton').addEventListener('click',async()=>{
+        try {
+          if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
+          else await document.exitFullscreen();
+        } catch(error) { console.warn('Полноэкранный режим недоступен:',error); }
+      });
+      function updateFullscreenButton() {
+        const active=!!document.fullscreenElement;
+        $('fullscreenButton').innerHTML=active?'<span class="symbol" aria-hidden="true">⛶</span><span>Обычный экран</span>':'<span class="symbol" aria-hidden="true">⛶</span><span>Экран</span>';
+        $('fullscreenButton').setAttribute('aria-label',active?'Выйти из полноэкранного режима':'Включить полноэкранный режим');
+      }
+      document.addEventListener('fullscreenchange',updateFullscreenButton);
+      $('closePanelButton').addEventListener('click',closeInfo);
+
+      function openHelp() { helpOverlay.classList.add('visible'); helpOverlay.setAttribute('aria-hidden','false'); $('closeHelpButton').focus(); }
+      function closeHelp() { helpOverlay.classList.remove('visible'); helpOverlay.setAttribute('aria-hidden','true'); $('helpButton').focus(); }
+      $('helpButton').addEventListener('click',openHelp);
+      $('closeHelpButton').addEventListener('click',closeHelp);
+      helpOverlay.addEventListener('click',event=>{if(event.target===helpOverlay) closeHelp();});
+
+      window.addEventListener('keydown',event=>{
+        const target=event.target;
+        const typing=target instanceof HTMLInputElement||target instanceof HTMLTextAreaElement||target instanceof HTMLSelectElement||target.isContentEditable;
+        if(event.key==='Escape') {
+          if(helpOverlay.classList.contains('visible')) closeHelp();
+          else if(infoPanel.classList.contains('visible')) closeInfo();
+          return;
+        }
+        if(typing) return;
+        if(event.code==='Space') {
+          if(target instanceof HTMLButtonElement||target instanceof HTMLAnchorElement) return;
+          event.preventDefault(); if(!event.repeat) togglePause();
+        }
+        if(event.key.toLowerCase()==='r') resetCamera();
+      });
+
+      function updateLabels() {
+        if(!labelsVisible) return;
+        const width=innerWidth,height=innerHeight;
+        for(const {element,entity} of labelRecords) {
+          const p=entity.object.position;
+          projected.set(p.x,p.y+entity.labelOffset,p.z).project(camera);
+          const x=(projected.x*.5+.5)*width, y=(-projected.y*.5+.5)*height;
+          const visible=projected.z<1&&projected.z>-1&&x>-90&&x<width+90&&y>-35&&y<height+35;
+          element.style.display=visible?'block':'none';
+          if(visible) { element.style.left=`${x}px`; element.style.top=`${y}px`; }
+        }
+      }
+
+      function updateCameraTween(now) {
+        if(!cameraTween) return;
+        const tween=cameraTween;
+        const t=Math.min((now-tween.start)/tween.duration,1);
+        const eased=t*t*(3-2*t);
+
+        // Если фокусируемся на планете, конечная позиция камеры двигается
+        // вместе с ней. Для сброса камеры используется фиксированная точка.
+        let targetPosition=tween.toTarget;
+        if(tween.entity) {
+          targetPosition=tween.entity.object.getWorldPosition(new THREE.Vector3());
+        }
+        const destinationPosition=tween.entity
+          ? targetPosition.clone().add(tween.cameraOffset)
+          : tween.toPosition;
+
+        camera.position.lerpVectors(tween.fromPosition,destinationPosition,eased);
+        controls.target.lerpVectors(tween.fromTarget,targetPosition,eased);
+
+        if(t>=1) {
+          camera.position.copy(destinationPosition);
+          controls.target.copy(targetPosition);
+          if(tween.entity) lastFollowPosition.copy(targetPosition);
+          cameraTween=null;
+        }
+      }
+
+      function updateCameraFollow() {
+        // После завершения плавного приближения сохраняем относительное
+        // положение камеры и переносим её вслед за движением выбранной планеты.
+        if(!followingEntity || cameraTween || !lastFollowPosition) return;
+        const currentPosition=followingEntity.object.getWorldPosition(new THREE.Vector3());
+        const movement=currentPosition.clone().sub(lastFollowPosition);
+        if(movement.lengthSq()>0) {
+          camera.position.add(movement);
+          controls.target.add(movement);
+          lastFollowPosition.copy(currentPosition);
+        }
+      }
+
+      const clock=new THREE.Clock();
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const delta=Math.min(clock.getDelta(),.05);
+        if(!paused) {
+          const dt=delta*speed;
+          sun.rotation.y+=dt*.055;
+          sunAura.rotation.y-=dt*.025;
+          for(const entity of planetRecords) {
+            entity.angle+=entity.orbitSpeed*dt;
+            entity.object.position.set(Math.cos(entity.angle)*entity.orbit,0,Math.sin(entity.angle)*entity.orbit);
+            entity.mesh.rotation.y+=dt*entity.rotationSpeed;
+          }
+          stars.rotation.y+=dt*.001;
+        }
+        updateCameraTween(now);
+        updateCameraFollow();
+        controls.update();
+        updateLabels();
+        renderer.render(scene,camera);
+      }
+      requestAnimationFrame(animate);
+
+      window.addEventListener('resize',()=>{
+        camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+        renderer.setPixelRatio(Math.min(devicePixelRatio||1,2)); renderer.setSize(innerWidth,innerHeight);
+      });
+
+      updatePauseButton(); updateFullscreenButton();
+      loadingText.textContent='Солнечная система готова';
+      setTimeout(()=>loadingScreen.classList.add('hidden'),350);
+
+    } catch (error) {
+      console.error('Не удалось загрузить Solar System 3D Explorer:',error);
+      document.getElementById('loadingSpinner').style.display='none';
+      loadingText.textContent='Не удалось загрузить 3D-сцену';
+      const message=document.createElement('div');
+      message.className='loading-error';
+      message.textContent='Браузер не смог загрузить Three.js с Unpkg. Проверьте подключение к интернету, доступ к unpkg.com и поддержку WebGL.';
+      const retry=document.createElement('button');
+      retry.className='loading-retry'; retry.type='button'; retry.textContent='Перезагрузить страницу';
+      retry.addEventListener('click',()=>location.reload());
+      loadingScreen.append(message,retry);
+    }
+  </script>
+</body>
+</html>

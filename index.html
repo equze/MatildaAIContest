@@ -168,6 +168,56 @@
     }
     h2 { margin: 0; font-size: 21px; letter-spacing: -.045em; }
     .section-hint { color: var(--muted-soft); font-size: 11px; }
+    .test-sort-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 9px;
+      flex: 0 0 auto;
+    }
+    .test-sort-label {
+      color: var(--muted-soft);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .test-sort-select {
+      min-height: 36px;
+      max-width: 270px;
+      padding: 0 32px 0 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      outline: none;
+      color: #e9def9;
+      background-color: rgba(167,122,255,.075);
+      font: inherit;
+      font-size: 10px;
+      cursor: pointer;
+      transition: border-color .18s ease, background .18s ease;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23bda4e5' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 11px center;
+    }
+    .test-sort-select:hover, .test-sort-select:focus { border-color: rgba(197,167,255,.55); background-color: rgba(167,122,255,.13); }
+    .test-sort-select option { color: #f5f0fc; background: #171122; }
+    .test-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+    .difficulty-chip, .test-date-chip {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 5px;
+      min-height: 24px;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--muted);
+      background: rgba(255,255,255,.025);
+      font-size: 9px;
+      line-height: 1.2;
+    }
+    .difficulty-chip { border-color: rgba(167,122,255,.22); background: rgba(167,122,255,.065); }
+    .difficulty-chip strong { color: #e7d9ff; font-size: 10px; font-weight: 650; }
+    .difficulty-chip small { color: var(--muted-soft); font-size: 8px; }
+    .test-date-chip { color: var(--muted-soft); }
     #tests-list { display: grid; gap: 12px; padding-bottom: 48px; }
     #tests-section[hidden] { display: none !important; }
     .stats-modal-backdrop {
@@ -495,7 +545,9 @@
       .hero-copy { font-size: 12px; }
       .hero-stat { display: flex; align-items: baseline; gap: 8px; padding: 8px 11px; }
       .hero-stat strong { font-size: 17px; }
-      .section-head { align-items: flex-start; flex-direction: column; gap: 5px; margin-top: 8px; }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: 8px; }
+      .test-sort-wrap { width: 100%; justify-content: space-between; }
+      .test-sort-select { width: min(72%, 290px); max-width: none; min-height: 35px; }
       h2 { font-size: 19px; }
       .test-card-head { padding: 16px 15px 12px; }
       .test-title { font-size: 18px; }
@@ -567,7 +619,22 @@
           <p class="section-kicker">COLLECTION</p>
           <h2 id="tests-heading">Сайты на сравнение</h2>
         </div>
-        <div class="section-hint">Выбери модель, чтобы посмотреть результат</div>
+        <div class="test-sort-wrap">
+          <label class="test-sort-label" for="test-sort">Сортировка</label>
+          <select class="test-sort-select" id="test-sort" aria-label="Сортировать тесты">
+            <option value="default">По порядку добавления</option>
+            <option value="date-desc">По дате выхода: сначала новые</option>
+            <option value="date-asc">По дате выхода: сначала старые</option>
+            <option value="difficulty-desc">По сложности: от высокой</option>
+            <option value="difficulty-asc">По сложности: от низкой</option>
+            <option value="time-asc">По времени создания: быстрее</option>
+            <option value="time-desc">По времени создания: дольше</option>
+            <option value="code-desc">По объёму кода: больше</option>
+            <option value="code-asc">По объёму кода: меньше</option>
+            <option value="models-desc">По числу моделей: больше</option>
+            <option value="name-asc">По названию: А–Я</option>
+          </select>
+        </div>
       </div>
       <div id="tests-list" aria-live="polite">
         <div class="empty-state">Загрузка тестов</div>
@@ -675,6 +742,8 @@
           <ul>
             <li>Данные каждой работы записываются в соответствующий <code>tests/название-режима/data.json</code>.</li>
             <li>Время указывается в секундах, количество правок, строк и символов — целыми числами.</li>
+            <li><strong>Сложность</strong> задаётся целым числом от 0 до 12 в поле <code>difficulty</code>. Значение 0 означает минимальную, а 12 — максимальную сложность.</li>
+            <li><strong>Дата выхода</strong> указывается в поле <code>releaseDate</code> в формате <code>ГГГГ-ММ-ДД</code> (например, <code>2026-11-17</code>). Она используется для сортировки по дате.</li>
             <li>Если показатель неизвестен или не измерялся, лучше оставить поле пустым или не указывать его, а не ставить приблизительное значение.</li>
             <li>После добавления нового режима его папку нужно включить в <code>tests/index.json</code>, чтобы главная страница и статистика загрузили его.</li>
           </ul>
@@ -733,6 +802,103 @@
       });
     }
 
+    function getDifficulty(test) {
+      if (test.difficulty === null || test.difficulty === undefined || test.difficulty === '') return null;
+      const value = Number(test.difficulty);
+      return Number.isInteger(value) && value >= 0 && value <= 12 ? value : null;
+    }
+
+    function getReleaseTimestamp(test) {
+      if (typeof test.releaseDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(test.releaseDate)) return null;
+      const [year, month, day] = test.releaseDate.split('-').map(Number);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+      return date.getTime();
+    }
+
+    function formatReleaseDate(test) {
+      const timestamp = getReleaseTimestamp(test);
+      return timestamp === null ? '' : new Intl.DateTimeFormat('ru-RU', {
+        day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
+      }).format(new Date(timestamp));
+    }
+
+    function getAverageModelMetric(test, field) {
+      const values = getAvailableModels(test)
+        .map(key => test.models?.[key]?.[field])
+        .filter(value => value !== null && value !== undefined && value !== '')
+        .map(Number)
+        .filter(value => Number.isFinite(value) && value >= 0);
+      return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+    }
+
+    function compareOptionalNumbers(a, b, direction = 1) {
+      if (a === null && b === null) return 0;
+      if (a === null) return 1;
+      if (b === null) return -1;
+      return (a - b) * direction;
+    }
+
+    function getSortedTests(tests) {
+      const sortMode = document.getElementById('test-sort')?.value || 'default';
+      const sorted = [...tests];
+      const stableOrder = (a, b) => (a._manifestOrder ?? 0) - (b._manifestOrder ?? 0);
+
+      sorted.sort((a, b) => {
+        let result = 0;
+        switch (sortMode) {
+          case 'date-desc':
+            result = compareOptionalNumbers(getReleaseTimestamp(a), getReleaseTimestamp(b), -1);
+            break;
+          case 'date-asc':
+            result = compareOptionalNumbers(getReleaseTimestamp(a), getReleaseTimestamp(b), 1);
+            break;
+          case 'difficulty-desc':
+            result = compareOptionalNumbers(getDifficulty(a), getDifficulty(b), -1);
+            break;
+          case 'difficulty-asc':
+            result = compareOptionalNumbers(getDifficulty(a), getDifficulty(b), 1);
+            break;
+          case 'time-asc':
+            result = compareOptionalNumbers(getAverageModelMetric(a, 'durationSeconds'), getAverageModelMetric(b, 'durationSeconds'), 1);
+            break;
+          case 'time-desc':
+            result = compareOptionalNumbers(getAverageModelMetric(a, 'durationSeconds'), getAverageModelMetric(b, 'durationSeconds'), -1);
+            break;
+          case 'code-desc':
+            result = compareOptionalNumbers(getAverageModelMetric(a, 'characters'), getAverageModelMetric(b, 'characters'), -1);
+            break;
+          case 'code-asc':
+            result = compareOptionalNumbers(getAverageModelMetric(a, 'characters'), getAverageModelMetric(b, 'characters'), 1);
+            break;
+          case 'models-desc':
+            result = getAvailableModels(b).length - getAvailableModels(a).length;
+            break;
+          case 'name-asc':
+            result = String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru');
+            break;
+          default:
+            result = stableOrder(a, b);
+        }
+        return result || stableOrder(a, b);
+      });
+      return sorted;
+    }
+
+    function renderTestList() {
+      const tests = getSortedTests(window.CONTEST_TESTS || []);
+      const cards = tests.map(renderTestCard);
+      const failed = window.CONTEST_LOAD_ERRORS || [];
+      if (failed.length) {
+        cards.push(`<div class="error-state"><strong>Некоторые тесты не загрузились</strong>${failed.map(item => escapeHTML(item.id)).join(', ')}. Проверь наличие data.json и корректность JSON.</div>`);
+      }
+      testsList.innerHTML = cards.length
+        ? cards.join('')
+        : '<div class="empty-state">Пока нет добавленных тестов. Создай папку в tests и добавь её название в tests/index.json.</div>';
+    }
+
+    document.getElementById('test-sort').addEventListener('change', renderTestList);
+
     function renderTestCard(test, index) {
       const availableModels = getAvailableModels(test);
       const modelButtons = Object.entries(MODEL_CONFIG).map(([key, config]) => {
@@ -757,6 +923,10 @@
               <span class="test-index">TEST ${String(index + 1).padStart(3, '0')}</span>
               <h3 class="test-title">${escapeHTML(test.title || test.id)}</h3>
               <p class="test-description">${escapeHTML(test.description || 'Описание теста пока не добавлено.')}</p>
+              <div class="test-meta">
+                <span class="difficulty-chip">Сложность <strong>${getDifficulty(test) === null ? '—' : getDifficulty(test)}</strong><small>/ 12</small></span>
+                ${formatReleaseDate(test) ? `<span class="test-date-chip">${escapeHTML(formatReleaseDate(test))}</span>` : ''}
+              </div>
             </div>
             <span class="participant-count">${availableModels.length} / 4 модели</span>
           </div>
@@ -1174,6 +1344,7 @@
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             data.id = id;
+            data._manifestOrder = ids.indexOf(id);
             return { ok: true, data };
           } catch (error) {
             return { ok: false, id, error };
@@ -1182,16 +1353,9 @@
 
         const validTests = results.filter(result => result.ok).map(result => result.data);
         window.CONTEST_TESTS = validTests;
+        window.CONTEST_LOAD_ERRORS = results.filter(result => !result.ok);
         testCount.textContent = String(validTests.length).padStart(2, '0');
-
-        const failed = results.filter(result => !result.ok);
-        const cards = validTests.map(renderTestCard);
-        if (failed.length) {
-          cards.push(`<div class="error-state"><strong>Некоторые тесты не загрузились</strong>${failed.map(item => escapeHTML(item.id)).join(', ')}. Проверь наличие data.json и корректность JSON.</div>`);
-        }
-        testsList.innerHTML = cards.length
-          ? cards.join('')
-          : '<div class="empty-state">Пока нет добавленных тестов. Создай папку в tests и добавь её название в tests/index.json.</div>';
+        renderTestList();
       } catch (error) {
         console.error('AI BATTLE BY FATMATILDA:', error);
         testCount.textContent = '00';
@@ -1200,6 +1364,7 @@
     }
 
     window.CONTEST_TESTS = [];
+    window.CONTEST_LOAD_ERRORS = [];
     loadTests();
   </script>
 </body>

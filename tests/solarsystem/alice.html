@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar System 3D Explorer</title>
+<style>
+  :root{
+    --bg:#05060f;
+    --panel:rgba(13,17,32,.82);
+    --border:rgba(120,160,255,.18);
+    --text:#e8edf7;
+    --muted:#8e9bb5;
+    --accent:#6ea8ff;
+    --accent2:#ffc46b;
+    --radius:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif}
+  #scene-container{position:fixed;inset:0}
+  canvas{display:block;touch-action:none}
+
+  /* ---------- Загрузка ---------- */
+  #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;z-index:2000;transition:opacity .6s ease;
+    padding:20px;text-align:center}
+  #loading.hidden{opacity:0;pointer-events:none}
+  .spinner{width:46px;height:46px;border-radius:50%;
+    border:3px solid rgba(110,168,255,.15);border-top-color:var(--accent);
+    animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loading p{color:var(--muted);font-size:14px;letter-spacing:.08em;max-width:420px}
+  #loading .err{color:#ff9d9d}
+
+  /* ---------- Назад ---------- */
+  .back-btn{position:fixed;top:16px;left:16px;z-index:1000;
+    display:inline-flex;align-items:center;gap:8px;
+    padding:10px 16px;border-radius:999px;text-decoration:none;
+    color:var(--text);background:var(--panel);border:1px solid var(--border);
+    backdrop-filter:blur(10px);font-size:14px;font-weight:600;
+    transition:background .2s,transform .15s}
+  .back-btn:hover{background:rgba(30,40,66,.9);transform:translateY(-1px)}
+  .back-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---------- Панель управления ---------- */
+  #controls{position:fixed;top:16px;right:16px;z-index:900;display:flex;
+    align-items:center;gap:8px;padding:8px 10px;border-radius:999px;
+    background:var(--panel);border:1px solid var(--border);backdrop-filter:blur(10px);flex-wrap:wrap;
+    max-width:calc(100vw - 96px)}
+  .ctl-btn{width:38px;height:38px;border-radius:50%;border:1px solid transparent;
+    background:rgba(255,255,255,.06);color:var(--text);font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:background .2s,transform .15s}
+  .ctl-btn:hover{background:rgba(110,168,255,.18);transform:scale(1.06)}
+  .ctl-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .ctl-btn.active{background:rgba(110,168,255,.28);border-color:var(--accent)}
+  .speed-wrap{display:flex;align-items:center;gap:8px;padding:0 6px}
+  .speed-wrap label{font-size:12px;color:var(--muted);white-space:nowrap}
+  #speedVal{font-size:12px;color:var(--accent);min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+  #speed{width:110px;accent-color:var(--accent);cursor:pointer}
+  #speed:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+  /* ---------- Инфо-панель ---------- */
+  #infoPanel{position:fixed;top:76px;right:16px;z-index:950;width:320px;max-width:calc(100vw - 32px);
+    max-height:calc(100vh - 96px);overflow-y:auto;
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px 22px;backdrop-filter:blur(14px);
+    opacity:0;transform:translateX(24px);pointer-events:none;
+    transition:opacity .35s ease,transform .35s ease}
+  #infoPanel.open{opacity:1;transform:translateX(0);pointer-events:auto}
+  #infoPanel .close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;
+    border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);
+    font-size:18px;cursor:pointer;line-height:1;transition:background .2s}
+  #infoPanel .close:hover{background:rgba(255,110,110,.25)}
+  #infoPanel .close:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  #pName{font-size:24px;font-weight:700;margin-bottom:4px;letter-spacing:.02em}
+  #pType{font-size:12px;color:var(--accent2);text-transform:uppercase;letter-spacing:.14em;margin-bottom:16px}
+  #infoPanel dl{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:14px}
+  .row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;
+    border-bottom:1px dashed rgba(120,160,255,.15);padding-bottom:6px}
+  .row dt{color:var(--muted)}
+  .row dd{text-align:right;font-weight:600}
+  #pFact{font-size:13px;line-height:1.55;color:#c7d2e8;
+    background:rgba(110,168,255,.08);border-left:3px solid var(--accent);
+    padding:10px 12px;border-radius:0 8px 8px 0}
+
+  /* ---------- Подписи объектов ---------- */
+  #labels{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+  .obj-label{position:absolute;pointer-events:none;
+    color:#dfe8ff;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+    text-shadow:0 0 6px rgba(0,0,0,.9),0 0 14px rgba(0,0,0,.7);
+    padding:2px 8px;border-radius:8px;background:rgba(8,10,22,.45);
+    white-space:nowrap;transform:translate(-50%,-160%);transition:opacity .3s}
+  .obj-label.sun-label{color:var(--accent2);border:1px solid rgba(255,196,107,.35)}
+  .obj-label.off{opacity:0}
+  .labels-hidden .obj-label{opacity:0}
+
+  /* ---------- Справка ---------- */
+  #helpModal{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;
+    background:rgba(3,4,10,.7);backdrop-filter:blur(4px);
+    opacity:0;pointer-events:none;transition:opacity .3s}
+  #helpModal.open{opacity:1;pointer-events:auto}
+  .help-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:28px 30px;max-width:420px;width:calc(100vw - 40px);position:relative}
+  .help-card h3{font-size:18px;margin-bottom:16px}
+  .help-card ul{list-style:none;display:grid;gap:10px;font-size:14px}
+  .help-card ul li{display:flex;justify-content:space-between;gap:16px;color:#c7d2e8}
+  .help-card kbd{background:rgba(255,255,255,.08);border:1px solid var(--border);
+    border-radius:6px;padding:2px 8px;font-family:inherit;font-size:12.5px;white-space:nowrap}
+  .help-card .close{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;
+    border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);
+    font-size:18px;cursor:pointer}
+  .help-card .close:hover{background:rgba(255,110,110,.25)}
+  .help-card .close:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---------- Адаптив ---------- */
+  @media (max-width:720px){
+    #controls{top:70px;right:12px;padding:6px 8px;gap:6px;max-width:calc(100vw - 24px)}
+    .ctl-btn{width:34px;height:34px;font-size:14px}
+    #speed{width:80px}
+    #infoPanel{top:auto;bottom:12px;right:12px;left:12px;width:auto;
+      transform:translateY(24px);max-height:46vh}
+    #infoPanel.open{transform:translateY(0)}
+    .help-card{padding:22px}
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-container"></div>
+<div id="labels" aria-hidden="true"></div>
+
+<a class="back-btn" href="../../index.html" aria-label="Вернуться на главную страницу">← Назад</a>
+
+<div id="controls" role="toolbar" aria-label="Управление сценой">
+  <button id="btnPlay" class="ctl-btn" aria-label="Пауза анимации" title="Пауза (Space)">⏸</button>
+  <div class="speed-wrap">
+    <label for="speed">Скорость</label>
+    <input type="range" id="speed" min="0" max="5" step="0.1" value="1"
+           aria-label="Скорость анимации">
+    <span id="speedVal">1,0×</span>
+  </div>
+  <button id="btnOrbits" class="ctl-btn active" aria-label="Показать или скрыть орбиты" aria-pressed="true" title="Орбиты">◯</button>
+  <button id="btnLabels" class="ctl-btn active" aria-label="Показать или скрыть подписи" aria-pressed="true" title="Подписи">🏷</button>
+  <button id="btnReset" class="ctl-btn" aria-label="Сбросить камеру" title="Сброс камеры (R)">⟲</button>
+  <button id="btnFullscreen" class="ctl-btn" aria-label="Полноэкранный режим" title="Полный экран">⛶</button>
+  <button id="btnHelp" class="ctl-btn" aria-label="Открыть справку по управлению" title="Справка">?</button>
+</div>
+
+<aside id="infoPanel" aria-live="polite" aria-label="Информация об объекте">
+  <button class="close" id="panelClose" aria-label="Закрыть панель информации">×</button>
+  <h2 id="pName"></h2>
+  <div id="pType"></div>
+  <dl>
+    <div class="row"><dt>Диаметр</dt><dd id="pDiameter"></dd></div>
+    <div class="row"><dt>Расстояние от Солнца</dt><dd id="pDistance"></dd></div>
+    <div class="row"><dt>Период обращения</dt><dd id="pPeriod"></dd></div>
+    <div class="row"><dt>Луны</dt><dd id="pMoons"></dd></div>
+    <div class="row"><dt>Длина суток</dt><dd id="pDay"></dd></div>
+  </dl>
+  <p id="pFact"></p>
+</aside>
+
+<div id="helpModal" role="dialog" aria-modal="true" aria-label="Справка по управлению">
+  <div class="help-card">
+    <button class="close" id="helpClose" aria-label="Закрыть справку">×</button>
+    <h3>Управление</h3>
+    <ul>
+      <li><span>Вращение сцены</span><kbd>ЛКМ / 1 палец</kbd></li>
+      <li><span>Масштаб</span><kbd>Колесо / щипок</kbd></li>
+      <li><span>Сдвиг камеры</span><kbd>ПКМ / 2 пальца</kbd></li>
+      <li><span>Пауза</span><kbd>Space</kbd></li>
+      <li><span>Сброс камеры</span><kbd>R</kbd></li>
+      <li><span>Закрыть панель/справку</span><kbd>Esc</kbd></li>
+      <li><span>Информация об объекте</span><span>клик по Солнцу или планете</span></li>
+    </ul>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loadingText">Инициализация Солнечной системы…</p>
+</div>
+
+<script>
+/* Загрузка Three.js с несколькими CDN на случай недоступности одного из них */
+(function(){
+  const CDN_URLS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js',
+    'https://unpkg.com/three@0.160.0/build/three.module.js',
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js'
+  ];
+  window.__loadThree = async function(){
+    let lastErr = null;
+    for (const url of CDN_URLS){
+      try { return await import(url); }
+      catch (e){ lastErr = e; }
+    }
+    throw lastErr || new Error('CDN недоступен');
+  };
+})();
+</script>
+
+<script type="module">
+let THREE;
+try {
+  THREE = await window.__loadThree();
+} catch (e){
+  document.querySelector('#loading .spinner').style.display = 'none';
+  const t = document.getElementById('loadingText');
+  t.textContent = 'Не удалось загрузить Three.js. Проверьте подключение к интернету и обновите страницу.';
+  t.classList.add('err');
+  throw e;
+}
+
+/* ============================== ДАННЫЕ ============================== */
+const BODIES = [
+  { id:'sun', name:'Солнце', type:'Звезда', diameter:'≈ 1 392 700 км', distance:'0 км',
+    period:'—', moons:'—', day:'≈ 25 земных сут (экватор)',
+    fact:'Содержит около 99,86% массы всей Солнечной системы.',
+    radius:5, orbit:0, orbitSpeed:0, rotSpeed:0.04, color:0xffc46b },
+  { id:'mercury', name:'Меркурий', type:'Каменистая планета', diameter:'≈ 4 879 км',
+    distance:'≈ 57,9 млн км', period:'≈ 88 сут', moons:'0', day:'≈ 58,6 земных сут',
+    fact:'Солнечные сутки здесь (176 земных дней) длятся вдвое дольше года.',
+    radius:0.9, orbit:14, orbitSpeed:1.7, rotSpeed:0.15, color:0x9c8e84, banded:false },
+  { id:'venus', name:'Венера', type:'Каменистая планета', diameter:'≈ 12 104 км',
+    distance:'≈ 108,2 млн км', period:'≈ 224,7 сут', moons:'0', day:'≈ 243 земных сут',
+    fact:'Вращается в обратную сторону: сутки здесь длиннее года.',
+    radius:1.5, orbit:19, orbitSpeed:1.2, rotSpeed:0.1, color:0xd9a86c, banded:false },
+  { id:'earth', name:'Земля', type:'Каменистая планета', diameter:'≈ 12 742 км',
+    distance:'≈ 149,6 млн км', period:'≈ 365,25 сут', moons:'1', day:'≈ 24 ч',
+    fact:'Единственная известная планета, где есть жизнь.',
+    radius:1.6, orbit:25, orbitSpeed:1.0, rotSpeed:0.55, color:0x4f8fd9, banded:false },
+  { id:'mars', name:'Марс', type:'Каменистая планета', diameter:'≈ 6 779 км',
+    distance:'≈ 227,9 млн км', period:'≈ 687 сут', moons:'2', day:'≈ 24,6 ч',
+    fact:'Гора Олимп на Марсе — самый высокий вулкан системы, около 22 км.',
+    radius:1.2, orbit:32, orbitSpeed:0.62, rotSpeed:0.5, color:0xc2693f, banded:false },
+  { id:'jupiter', name:'Юпитер', type:'Газовый гигант', diameter:'≈ 139 820 км',
+    distance:'≈ 778,5 млн км', period:'≈ 4 333 сут', moons:'~95 (прибл.)', day:'≈ 9,9 ч',
+    fact:'Большое красное пятно — шторм, крупнее всей Земли, бушует веками.',
+    radius:4.2, orbit:45, orbitSpeed:0.24, rotSpeed:1.1, color:0xd8b48a, banded:true },
+  { id:'saturn', name:'Сатурн', type:'Газовый гигант', diameter:'≈ 116 460 км',
+    distance:'≈ 1 434 млн км', period:'≈ 10 759 сут', moons:'~146 (прибл.)', day:'≈ 10,7 ч',
+    fact:'Его плотность меньше плотности воды — планета «умела бы плавать».',
+    radius:3.6, orbit:60, orbitSpeed:0.16, rotSpeed:1.0, color:0xe3cf9a, banded:true, ring:true },
+  { id:'uranus', name:'Уран', type:'Ледяной гигант', diameter:'≈ 50 724 км',
+    distance:'≈ 2 871 млн км', period:'≈ 30 687 сут', moons:'~28 (прибл.)', day:'≈ 17,2 ч',
+    fact:'Вращается «лёжа на боку»: наклон оси — около 98 градусов.',
+    radius:2.4, orbit:74, orbitSpeed:0.09, rotSpeed:0.7, color:0x9fd8dc, banded:true, tilt:1.71 },
+  { id:'neptune', name:'Нептун', type:'Ледяной гигант', diameter:'≈ 49 244 км',
+    distance:'≈ 4 495 млн км', period:'≈ 60 190 сут', moons:'~16 (прибл.)', day:'≈ 16,1 ч',
+    fact:'Здесь самые сильные ветра в Солнечной системе — до 2 100 км/ч.',
+    radius:2.3, orbit:86, orbitSpeed:0.06, rotSpeed:0.7, color:0x4f6ed9, banded:true }
+];
+
+const DEFAULT_CAM_POS = new THREE.Vector3(0, 58, 112);
+const DEFAULT_TARGET  = new THREE.Vector3(0, 0, 0);
+
+/* ============================== СЦЕНА ============================== */
+const container = document.getElementById('scene-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 3000);
+camera.position.copy(DEFAULT_CAM_POS);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+container.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0x8899bb, 0.35));
+const sunLight = new THREE.PointLight(0xfff2d0, 2.6);
+sunLight.decay = 0;
+scene.add(sunLight);
+
+/* ---------- Звёздный фон ---------- */
+{
+  const count = 3500;
+  const pos = new Float32Array(count*3);
+  const col = new Float32Array(count*3);
+  for (let i=0;i<count;i++){
+    const r = 380 + Math.random()*520;
+    const th = Math.random()*Math.PI*2;
+    const ph = Math.acos(2*Math.random()-1);
+    pos[i*3]   = r*Math.sin(ph)*Math.cos(th);
+    pos[i*3+1] = r*Math.cos(ph);
+    pos[i*3+2] = r*Math.sin(ph)*Math.sin(th);
+    const t = 0.75 + Math.random()*0.25;
+    col[i*3]=t; col[i*3+1]=t; col[i*3+2]=Math.min(1, t+0.12*Math.random());
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color', new THREE.BufferAttribute(col,3));
+  const m = new THREE.PointsMaterial({ size:1.6, sizeAttenuation:false,
+    vertexColors:true, transparent:true, opacity:0.9, depthWrite:false });
+  scene.add(new THREE.Points(g, m));
+}
+
+/* ---------- Текстуры (генерируются один раз) ---------- */
+function makeCanvas(w, h, draw){
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function planetTexture(hex, banded){
+  const col = new THREE.Color(hex);
+  return makeCanvas(256, 128, (ctx,w,h)=>{
+    const gr = ctx.createLinearGradient(0,0,0,h);
+    gr.addColorStop(0, `rgb(${col.r*140|0},${col.g*140|0},${col.b*140|0})`);
+    gr.addColorStop(0.5, `#${col.getHexString()}`);
+    gr.addColorStop(1, `rgb(${col.r*90|0},${col.g*90|0},${col.b*90|0})`);
+    ctx.fillStyle = gr; ctx.fillRect(0,0,w,h);
+    if (banded){
+      for (let i=0;i<9;i++){
+        const y = Math.random()*h, bh = 6+Math.random()*14;
+        ctx.globalAlpha = 0.10+Math.random()*0.16;
+        ctx.fillStyle = Math.random()>0.5 ? '#ffffff' : '#000000';
+        ctx.fillRect(0,y,w,bh);
+      }
+    } else {
+      for (let i=0;i<160;i++){
+        ctx.globalAlpha = 0.05+Math.random()*0.12;
+        ctx.fillStyle = Math.random()>0.5 ? '#ffffff' : '#000000';
+        const s = 2+Math.random()*10;
+        ctx.beginPath();
+        ctx.arc(Math.random()*w, Math.random()*h, s, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+  });
+}
+const sunTexture = makeCanvas(256,128,(ctx,w,h)=>{
+  const gr = ctx.createLinearGradient(0,0,0,h);
+  gr.addColorStop(0,'#ffdf8a'); gr.addColorStop(0.5,'#ffb84d'); gr.addColorStop(1,'#ff9a2e');
+  ctx.fillStyle = gr; ctx.fillRect(0,0,w,h);
+  for (let i=0;i<50;i++){
+    ctx.globalAlpha = 0.08+Math.random()*0.1;
+    ctx.fillStyle = Math.random()>0.5 ? '#fff3c0' : '#e07000';
+    ctx.beginPath();
+    ctx.arc(Math.random()*w, Math.random()*h, 4+Math.random()*14, 0, Math.PI*2);
+    ctx.fill();
+  }
+});
+const glowTexture = makeCanvas(256,256,(ctx)=>{
+  const gr = ctx.createRadialGradient(128,128,20,128,128,128);
+  gr.addColorStop(0,'rgba(255,200,110,0.85)');
+  gr.addColorStop(0.35,'rgba(255,160,60,0.28)');
+  gr.addColorStop(1,'rgba(255,140,40,0)');
+  ctx.fillStyle = gr; ctx.fillRect(0,0,256,256);
+});
+
+/* ---------- Орбиты: одна общая геометрия ---------- */
+const orbitPts = [];
+for (let i=0;i<=128;i++){
+  const a = (i/128)*Math.PI*2;
+  orbitPts.push(new THREE.Vector3(Math.cos(a),0,Math.sin(a)));
+}
+const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPts);
+const orbitLines = [];
+
+/* ---------- Создание объектов ---------- */
+const sphereGeo = new THREE.SphereGeometry(1, 48, 32);
+const clickable = [];
+const labels = []; // { el, mesh }
+
+BODIES.forEach((d)=>{
+  const pivot = new THREE.Object3D();
+  pivot.rotation.y = Math.random()*Math.PI*2;
+  scene.add(pivot);
+
+  const tiltGroup = new THREE.Object3D();
+  tiltGroup.position.x = d.orbit;
+  if (d.tilt) tiltGroup.rotation.z = d.tilt;
+  pivot.add(tiltGroup);
+
+  let mat;
+  if (d.id === 'sun'){
+    mat = new THREE.MeshBasicMaterial({ map:sunTexture });
+  } else {
+    mat = new THREE.MeshStandardMaterial({
+      map: planetTexture(d.color, d.banded), roughness:0.9, metalness:0.05
+    });
+  }
+  const mesh = new THREE.Mesh(sphereGeo, mat);
+  mesh.scale.setScalar(d.radius);
+  mesh.userData = { info:d, baseScale:d.radius, isSun:d.id==='sun' };
+  tiltGroup.add(mesh);
+  clickable.push(mesh);
+
+  if (d.ring){
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(d.radius*1.4, d.radius*2.3, 64),
+      new THREE.MeshBasicMaterial({ color:0xd8c890, side:THREE.DoubleSide,
+        transparent:true, opacity:0.55 })
+    );
+    ring.rotation.x = -Math.PI/2;
+    tiltGroup.add(ring);
+  }
+
+  if (d.id === 'sun'){
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map:glowTexture, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending }));
+    glow.scale.setScalar(d.radius*5.5);
+    tiltGroup.add(glow);
+  }
+
+  if (d.orbit > 0){
+    const line = new THREE.Line(orbitGeo,
+      new THREE.LineBasicMaterial({ color:0x6ea8ff, transparent:true, opacity:0.16 }));
+    line.scale.setScalar(d.orbit);
+    scene.add(line);
+    orbitLines.push(line);
+  }
+
+  const el = document.createElement('div');
+  el.className = 'obj-label' + (d.id==='sun' ? ' sun-label' : '');
+  el.textContent = d.name;
+  document.getElementById('labels').appendChild(el);
+  labels.push({ el, mesh });
+
+  d._pivot = pivot;
+  d._mesh = mesh;
+  d._angle = Math.random()*Math.PI*2;
+  d._orbitSpeed = Math.pow(d.orbitSpeed, 0.75) * 0.22;
+});
+
+/* ============================== МИНИ-ORBITCONTROLS ============================== */
+/* Собственная лёгкая реализация: вращение, зум, панорамирование, тач-жесты */
+const MIN_R = 7, MAX_R = 320;
+
+const controls = {
+  target: DEFAULT_TARGET.clone(),
+  tTarget: DEFAULT_TARGET.clone(),
+  theta: 0, phi: 0, radius: 1,
+  thetaT: 0, phiT: 0, radiusT: 1,
+  damp: 0.09,
+  enabled: true
+};
+(function initSpherical(){
+  const off = camera.position.clone().sub(controls.target);
+  controls.radius = controls.radiusT = off.length();
+  controls.theta = controls.thetaT = Math.atan2(off.x, off.z);
+  controls.phi = controls.phiT = Math.acos(THREE.MathUtils.clamp(off.y/controls.radius, -1, 1));
+})();
+
+function clampOrbit(){
+  controls.radiusT = THREE.MathUtils.clamp(controls.radiusT, MIN_R, MAX_R);
+  controls.phiT = THREE.MathUtils.clamp(controls.phiT, 0.08, Math.PI - 0.08);
+}
+function controlsUpdate(){
+  const d = controls.damp;
+  controls.theta += (controls.thetaT - controls.theta) * d;
+  controls.phi   += (controls.phiT   - controls.phi)   * d;
+  controls.radius+= (controls.radiusT- controls.radius)* d;
+  controls.target.lerp(controls.tTarget, Math.min(1, d*1.6));
+  const t = controls.target;
+  camera.position.set(
+    t.x + controls.radius * Math.sin(controls.phi) * Math.sin(controls.theta),
+    t.y + controls.radius * Math.cos(controls.phi),
+    t.z + controls.radius * Math.sin(controls.phi) * Math.cos(controls.theta)
+  );
+  camera.lookAt(t);
+}
+function controlsSyncFromCamera(){
+  const off = camera.position.clone().sub(controls.target);
+  const r = Math.max(off.length(), 0.001);
+  controls.radius = controls.radiusT = THREE.MathUtils.clamp(r, MIN_R, MAX_R);
+  controls.theta = controls.thetaT = Math.atan2(off.x, off.z);
+  controls.phi = controls.phiT = THREE.MathUtils.clamp(Math.acos(THREE.MathUtils.clamp(off.y/r, -1, 1)), 0.08, Math.PI-0.08);
+  controls.tTarget.copy(controls.target);
+}
+function panBy(dx, dy){
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+  const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+  const f = controls.radius * 0.0012;
+  controls.tTarget.addScaledVector(right, -dx*f).addScaledVector(up, dy*f);
+  controls.target.copy(controls.tTarget);
+}
+
+const pointers = new Map();
+let gestureMode = null; // 'rotate' | 'pan' | 'pinch'
+let prevMid = {x:0,y:0}, prevDist = 0;
+let userInterrupt = null; // колбэк для отмены твина при касании
+
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+renderer.domElement.addEventListener('pointerdown', e => {
+  renderer.domElement.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if (pointers.size === 1){
+    gestureMode = (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'rotate';
+  } else if (pointers.size === 2){
+    const pts = [...pointers.values()];
+    prevDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    prevMid = { x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2 };
+    gestureMode = 'pinch';
+  }
+  if (userInterrupt) userInterrupt();
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  if (!p || !controls.enabled) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY;
+
+  if (gestureMode === 'rotate'){
+    controls.thetaT -= dx * 0.005;
+    controls.phiT   -= dy * 0.005;
+    clampOrbit();
+  } else if (gestureMode === 'pan'){
+    panBy(dx, dy);
+  } else if (gestureMode === 'pinch' && pointers.size === 2){
+    const pts = [...pointers.values()];
+    const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    if (prevDist > 0) controls.radiusT = THREE.MathUtils.clamp(controls.radiusT * prevDist/dist, MIN_R, MAX_R);
+    const mid = { x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2 };
+    panBy(mid.x-prevMid.x, mid.y-prevMid.y);
+    prevMid = mid; prevDist = dist;
+  }
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if (pointers.size === 0) gestureMode = null;
+  else if (pointers.size === 1) gestureMode = 'rotate';
+}
+renderer.domElement.addEventListener('pointerup', endPointer);
+renderer.domElement.addEventListener('pointercancel', endPointer);
+renderer.domElement.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (userInterrupt) userInterrupt();
+  controls.radiusT = THREE.MathUtils.clamp(controls.radiusT * Math.exp(e.deltaY*0.0012), MIN_R, MAX_R);
+}, { passive:false });
+
+/* ============================== СОСТОЯНИЕ ============================== */
+let paused = false;
+let speed = 1;
+let hoverObj = null;
+let selected = null;
+let tween = null;
+let follow = null;
+
+const clock = new THREE.Clock();
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+const tmpV = new THREE.Vector3();
+const easeInOut = t => t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+
+/* ============================== UI ============================== */
+const $ = id => document.getElementById(id);
+const panel = $('infoPanel');
+const helpModal = $('helpModal');
+const btnPlay = $('btnPlay');
+const btnOrbits = $('btnOrbits');
+const btnLabels = $('btnLabels');
+const speedInput = $('speed');
+const speedVal = $('speedVal');
+
+function setHover(obj){
+  if (hoverObj === obj) return;
+  if (hoverObj){
+    const m = hoverObj.material;
+    if (hoverObj.userData.isSun) m.color.setHex(0xffffff);
+    else m.emissive.setHex(0x000000);
+  }
+  hoverObj = obj;
+  if (hoverObj){
+    const m = hoverObj.material;
+    if (hoverObj.userData.isSun) m.color.setHex(0xfff2c0);
+    else m.emissive.setHex(0x3a3a3a);
+  }
+  renderer.domElement.style.cursor = hoverObj ? 'pointer' : '';
+}
+
+function openPanel(d){
+  $('pName').textContent = d.name;
+  $('pType').textContent = d.type;
+  $('pDiameter').textContent = d.diameter;
+  $('pDistance').textContent = d.distance;
+  $('pPeriod').textContent = d.period;
+  $('pMoons').textContent = d.moons;
+  $('pDay').textContent = d.day;
+  $('pFact').textContent = d.fact;
+  panel.classList.add('open');
+}
+function closePanel(){ panel.classList.remove('open'); }
+function deselect(){
+  selected = null;
+  follow = null;
+  closePanel();
+}
+
+function focusOn(obj){
+  selected = obj;
+  follow = null;
+  openPanel(obj.userData.info);
+  obj.getWorldPosition(tmpV);
+  const dir = camera.position.clone().sub(tmpV);
+  if (dir.lengthSq() < 0.001) dir.set(0,0.5,1);
+  dir.normalize();
+  const dist = Math.max(obj.userData.baseScale*5, 9);
+  tween = { t:0, dur:1.2, startCam:camera.position.clone(),
+    startTarget:controls.target.clone(), obj, dist, dir };
+}
+
+function resetCamera(){
+  follow = null;
+  tween = { t:0, dur:1.0, startCam:camera.position.clone(),
+    startTarget:controls.target.clone(),
+    endCam:DEFAULT_CAM_POS.clone(), endTarget:DEFAULT_TARGET.clone() };
+}
+
+btnPlay.addEventListener('click', ()=>{
+  paused = !paused;
+  btnPlay.textContent = paused ? '▶' : '⏸';
+  btnPlay.setAttribute('aria-label', paused ? 'Воспроизведение анимации' : 'Пауза анимации');
+});
+speedInput.addEventListener('input', ()=>{
+  speed = parseFloat(speedInput.value);
+  speedVal.textContent = speed.toFixed(1).replace('.', ',') + '×';
+});
+btnOrbits.addEventListener('click', ()=>{
+  const show = !btnOrbits.classList.contains('active');
+  btnOrbits.classList.toggle('active', show);
+  btnOrbits.setAttribute('aria-pressed', String(show));
+  orbitLines.forEach(l => l.visible = show);
+});
+btnLabels.addEventListener('click', ()=>{
+  const show = !btnLabels.classList.contains('active');
+  btnLabels.classList.toggle('active', show);
+  btnLabels.setAttribute('aria-pressed', String(show));
+  document.getElementById('labels').classList.toggle('labels-hidden', !show);
+});
+btnReset.addEventListener('click', resetCamera);
+$('btnFullscreen').addEventListener('click', ()=>{
+  if (document.fullscreenElement){
+    document.exitFullscreen().catch(()=>{});
+  } else if (document.documentElement.requestFullscreen){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
+});
+$('btnHelp').addEventListener('click', ()=> helpModal.classList.add('open'));
+$('helpClose').addEventListener('click', ()=> helpModal.classList.remove('open'));
+helpModal.addEventListener('click', e => {
+  if (e.target === helpModal) helpModal.classList.remove('open');
+});
+$('panelClose').addEventListener('click', deselect);
+
+document.addEventListener('keydown', e=>{
+  if (e.code === 'Space'){
+    e.preventDefault();
+    btnPlay.click();
+  } else if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey){
+    resetCamera();
+  } else if (e.code === 'Escape'){
+    if (helpModal.classList.contains('open')) helpModal.classList.remove('open');
+    else deselect();
+  }
+});
+
+/* ---------- Указатель: hover и click ---------- */
+function pick(e){
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointerNDC.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+  pointerNDC.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+  raycaster.setFromCamera(pointerNDC, camera);
+  const hits = raycaster.intersectObjects(clickable, false);
+  return hits.length ? hits[0].object : null;
+}
+
+let downX = 0, downY = 0, isDown = false;
+renderer.domElement.addEventListener('pointerdown', e=>{
+  isDown = true; downX = e.clientX; downY = e.clientY;
+});
+renderer.domElement.addEventListener('pointerup', e=>{
+  if (!isDown) return;
+  isDown = false;
+  if (Math.hypot(e.clientX-downX, e.clientY-downY) > 6) return; // это было вращение
+  const hit = pick(e);
+  if (hit) focusOn(hit);
+  else deselect();
+});
+renderer.domElement.addEventListener('pointermove', e=>{
+  if (isDown || pointers.size > 0) { setHover(null); return; }
+  setHover(pick(e));
+});
+renderer.domElement.addEventListener('pointerleave', ()=> setHover(null));
+
+/* Пользовательское касание прерывает автополёт камеры */
+userInterrupt = ()=>{
+  tween = null;
+  follow = null;
+  controlsSyncFromCamera();
+};
+
+/* ---------- Изменение размера ---------- */
+function onResize(){
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', onResize);
+
+/* ============================== ПОДПИСИ ============================== */
+function updateLabels(){
+  const w = innerWidth, h = innerHeight;
+  for (const { el, mesh } of labels){
+    mesh.getWorldPosition(tmpV);
+    tmpV.project(camera);
+    if (tmpV.z < 1){
+      el.style.left = ((tmpV.x*0.5+0.5)*w) + 'px';
+      el.style.top  = ((-tmpV.y*0.5+0.5)*h) + 'px';
+      el.classList.remove('off');
+    } else {
+      el.classList.add('off');
+    }
+  }
+}
+
+/* ============================== ЦИКЛ ============================== */
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const s = paused ? 0 : speed;
+
+  BODIES.forEach(d=>{
+    if (d.orbit > 0 && s > 0) d._angle += d._orbitSpeed * s * dt;
+    d._pivot.rotation.y = d._angle;
+    d._mesh.rotation.y += d.rotSpeed * s * dt * 0.6;
+  });
+
+  /* Фокус камеры */
+  if (tween){
+    tween.t = Math.min(tween.t + dt/tween.dur, 1);
+    const a = easeInOut(tween.t);
+    if (tween.obj){
+      tween.obj.getWorldPosition(tmpV);
+      const dest = tmpV.clone().addScaledVector(tween.dir, tween.dist);
+      camera.position.lerpVectors(tween.startCam, dest, a);
+      controls.target.lerpVectors(tween.startTarget, tmpV, a);
+      if (tween.t >= 1){
+        follow = { obj:tween.obj, last:tmpV.clone() };
+        tween = null;
+      }
+    } else {
+      camera.position.lerpVectors(tween.startCam, tween.endCam, a);
+      controls.target.lerpVectors(tween.startTarget, tween.endTarget, a);
+      if (tween.t >= 1) tween = null;
+    }
+    controlsSyncFromCamera();
+  } else if (follow){
+    follow.obj.getWorldPosition(tmpV);
+    camera.position.add(tmpV.clone().sub(follow.last));
+    controls.target.copy(tmpV);
+    follow.last.copy(tmpV);
+    controlsSyncFromCamera();
+  } else {
+    controlsUpdate();
+  }
+
+  renderer.render(scene, camera);
+  updateLabels();
+}
+
+animate();
+
+/* Убираем загрузочный экран после первых кадров */
+requestAnimationFrame(()=> requestAnimationFrame(()=>{
+  document.getElementById('loading').classList.add('hidden');
+}));
+</script>
+</body>
+</html>
